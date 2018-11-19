@@ -9,10 +9,12 @@
 #include <webots/emitter.h>
 #include <webots/supervisor.h>
 
-#define FLOCK_SIZE	10		// Number of robots in flock
+#define FLOCK_SIZE	5		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
+
+#define RULE1_THRESHOLD 0.2
 
 WbNodeRef robs[FLOCK_SIZE];		// Robots nodes
 WbFieldRef robs_trans[FLOCK_SIZE];	// Robots translation fields
@@ -78,7 +80,7 @@ void compute_fitness(float* fit_c, float* fit_o) {
     // Velocity of the team towards the goal direction
     
 
-    /* *fit_c = 0; *fit_o = 0;
+    *fit_c = 0; *fit_o = 0;
     // Compute performance indices
     // Based on distance of the robots compared to the threshold and the deviation from the perfect angle towards
     // the migration goal
@@ -98,13 +100,13 @@ void compute_fitness(float* fit_c, float* fit_o) {
     
     *fit_c /= FLOCK_SIZE*(FLOCK_SIZE+1)/2;
     *fit_o /= FLOCK_SIZE;
-    */
 }
 
 /*
  * Main function.
  */
 int main(int argc, char *args[]) {
+    char buffer[255];	// Buffer for sending data
     int i;  // Index
     
     if (argc == 4) { // Get parameters
@@ -145,8 +147,8 @@ int main(int argc, char *args[]) {
                 loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
                 				
                 // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
-                sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
-                wb_emitter_send(emitter,buffer,strlen(buffer));				
+               // sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
+               // wb_emitter_send(emitter,buffer,strlen(buffer));				
             }
             
             //Compute and normalize fitness values
