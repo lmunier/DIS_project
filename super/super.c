@@ -14,6 +14,9 @@
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
 
+
+#define MAX_SPEED         0.1287     // Maximum speed [m/s]
+
 #define RULE1_THRESHOLD 0.2
 
 WbNodeRef robs[FLOCK_SIZE];		// Robots nodes
@@ -22,6 +25,7 @@ WbFieldRef robs_rotation[FLOCK_SIZE];	// Robots rotation fields
 WbDeviceTag emitter;			// Single emitter
 
 float loc[FLOCK_SIZE][3];		// Location of everybody in the flock
+float speed[FLOCK_SIZE];                    // Speed of everybody in the flock
 
 int offset;			// Offset of robots number
 float migrx, migrz;			// Migration vector
@@ -35,11 +39,11 @@ void reset(void) {
     wb_robot_init();
     
     emitter = wb_robot_get_device("emitter");
-    if (emitter==0) printf("missing emitter\n");
+    if (emitter == 0) printf("missing emitter\n");
     	
     char rob[7] = "epuck0";
-    int i;
-    for (i=0;i<FLOCK_SIZE;i++) {
+    
+    for (int i=0; i<FLOCK_SIZE; i++) {
         sprintf(rob,"epuck%d",i+offset);
         robs[i] = wb_supervisor_node_get_from_def(rob);
         robs_trans[i] = wb_supervisor_node_get_field(robs[i],"translation");
@@ -52,9 +56,8 @@ void reset(void) {
  */
 void send_init_poses(void) {
     char buffer[255];	// Buffer for sending data
-    int i;
            
-    for (i=0;i<FLOCK_SIZE;i++) {
+    for (int i=0; i<FLOCK_SIZE; i++) {
         // Get data
         loc[i][0] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[0]; // X
         loc[i][1] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[2]; // Z
@@ -72,25 +75,57 @@ void send_init_poses(void) {
 /*
  * Compute performance metric.
  */
-void compute_fitness(float* fit_c, float* fit_o) {
+void compute_fitness(float *p_t, float *p_mean) {
+    float mean_x = 0.0, mean_z = 0.0, old_mean_x = 0.0, old_mean_z = 0.0;
+    float dist = 0.0;
+    float fit_c, fit_o, fit_s;
+    static float im_o, re_o;
+    
     // Orientation between robots
+    for(int i=0; i<FLOCK_SIZE; i++){
+        re_o += cosf(loc[i][2]);
+        im_o += sinf(loc[i][2]);
+    }
+    
+    fit_o = sqrtf(re_o*re_o + im_o*im_o);
     
     // Distance between robots
+    for(int i=0; i<FLOCK_SIZE; i++){
+        mean_x += loc[i][0];
+        mean_z += loc[i][1];
+    }
+    
+    mean_x /= FLOCK_SIZE;
+    mean_z /= FLOCK_SIZE;
+    
+    for(int i=0; i<FLOCK_SIZE; i++){
+        dist += sqrtf((loc[i][0] - mean_x)*(loc[i][0] - mean_x) + (loc[i][1] - mean_z)*(loc[i][1] - mean_z));
+    }
+    
+    fit_c = 1/(dist/FLOCK_SIZE + 1);
     
     // Velocity of the team towards the goal direction
-    
+    float max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
+                                          (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
+    fit_s = (max_a < 0) ? 0 : max_a;
 
-    *fit_c = 0; *fit_o = 0;
+    old_mean_x = mean_x;
+    old_mean_z = mean_z;
+    
+    // Return performance metrix
+    *p_t = fit_c*fit_o*fit_s;
+    *p_mean = (*p_mean*(t-TIME_STEP) + *p_t)/t;
+
     // Compute performance indices
     // Based on distance of the robots compared to the threshold and the deviation from the perfect angle towards
     // the migration goal
-    float angle_diff;
+    /*float angle_diff;
     int i; int j;
     
     for (i=0;i<FLOCK_SIZE;i++) {
         for (j=i+1;j<FLOCK_SIZE;j++) {	
             // Distance measure for each pair ob robots
-            *fit_c += fabs(sqrtf(powf(loc[i][0]-loc[j][0],2)+powf(loc[i][1]-loc[j][1],2))-RULE1_THRESHOLD*2);
+            *fit_c += fabs(sqrtf(powf(loc[i][0]-loc[j][0],2)+powf(loc[i][1]-loc[j][1],2)));
         }
     
         // Angle measure for each robot
@@ -99,7 +134,7 @@ void compute_fitness(float* fit_c, float* fit_o) {
     }
     
     *fit_c /= FLOCK_SIZE*(FLOCK_SIZE+1)/2;
-    *fit_o /= FLOCK_SIZE;
+    *fit_o /= FLOCK_SIZE;*/
 }
 
 /*
@@ -107,7 +142,6 @@ void compute_fitness(float* fit_c, float* fit_o) {
  */
 int main(int argc, char *args[]) {
     char buffer[255];	// Buffer for sending data
-    int i;  // Index
     
     if (argc == 4) { // Get parameters
         offset = atoi(args[1]);
@@ -123,40 +157,34 @@ int main(int argc, char *args[]) {
     }
     
     orient_migr = -atan2f(migrx,migrz);
+    
     if (orient_migr<0) {
         orient_migr+=2*M_PI; // Keep value within 0, 2pi
     }
     
     reset();
-    
     send_init_poses();
 	
     // Compute reference fitness values
-    
-    float fit_cluster;  // Performance metric for aggregation
-    float fit_orient;   // Performance metric for orientation
+    float p_t = 0.0, p_mean = 0.0;
     		
     for(;;) {
         wb_robot_step(TIME_STEP);
     		
         if (t % 10 == 0) {
-            for (i=0;i<FLOCK_SIZE;i++) {
+            for (int i=0; i<FLOCK_SIZE; i++) {
                 // Get data
                 loc[i][0] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[0]; // X
                 loc[i][1] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[2]; // Z
                 loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
                 				
                 // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
-               // sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
-               // wb_emitter_send(emitter,buffer,strlen(buffer));				
+                sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
+                wb_emitter_send(emitter,buffer,strlen(buffer));				
             }
             
             //Compute and normalize fitness values
-            compute_fitness(&fit_cluster, &fit_orient);
-            fit_cluster = fit_cluster_ref/fit_cluster;
-            fit_orient = 1-fit_orient/M_PI;
-            
-            printf("time:%d, Topology Performance: %f\n", t, fit_cluster);			
+            compute_fitness(&p_t, &p_mean);			
         			
         }
     		
