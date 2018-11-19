@@ -11,6 +11,8 @@
 
 #define FLOCK_SIZE	10		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
+#define fit_cluster_ref 0.03
+#define fit_orient_ref 1.0
 
 WbNodeRef robs[FLOCK_SIZE];		// Robots nodes
 WbFieldRef robs_trans[FLOCK_SIZE];	// Robots translation fields
@@ -18,11 +20,6 @@ WbFieldRef robs_rotation[FLOCK_SIZE];	// Robots rotation fields
 WbDeviceTag emitter;			// Single emitter
 
 float loc[FLOCK_SIZE][3];		// Location of everybody in the flock
-
-#define RULE1_THRESHOLD 0.2
-#define fit_cluster_ref 0.03
-#define fit_orient_ref 1.0
-
 
 int offset;			// Offset of robots number
 float migrx, migrz;			// Migration vector
