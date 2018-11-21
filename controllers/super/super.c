@@ -15,7 +15,7 @@
 #define fit_orient_ref 1.0
 
 
-#define MAX_SPEED         0.1287     // Maximum speed [m/s]
+#define MAX_SPEED         0.1287     	// Maximum speed [m/s]
 
 #define RULE1_THRESHOLD 0.2
 
@@ -25,9 +25,9 @@ WbFieldRef robs_rotation[FLOCK_SIZE];	// Robots rotation fields
 WbDeviceTag emitter;			// Single emitter
 
 float loc[FLOCK_SIZE][3];		// Location of everybody in the flock
-float speed[FLOCK_SIZE];                    // Speed of everybody in the flock
+float speed[FLOCK_SIZE];                // Speed of everybody in the flock
 
-int offset;			// Offset of robots number
+int offset;				// Offset of robots number
 float migrx, migrz;			// Migration vector
 float orient_migr; 			// Migration orientation
 int t;
