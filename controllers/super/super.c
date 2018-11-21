@@ -103,7 +103,7 @@ void compute_fitness(float *p_t, float *p_mean) {
     }
     
     fit_c = 1/(dist/FLOCK_SIZE + 1);
-    
+    printf("%f",fit_c)
     // Velocity of the team towards the goal direction
     float max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
                                           (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;

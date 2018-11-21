@@ -525,7 +525,7 @@ Supervisor {
   ]
   name "super1"
   controller "super"
-  controllerArgs "0 25 -25"
+  controllerArgs "0 25 0"
 }
 DEF epuck0 E-puck {
   hidden position_0_0 1.5357847128286672e-8

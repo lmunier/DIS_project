@@ -73,7 +73,7 @@ float prev_my_position[3];  		// X, Z, Theta of the current robot in the previou
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {25,-25};	        // Migration vector
+float migr[2] = {25,0};	        // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
@@ -236,7 +236,7 @@ void reynolds_rules() {
 		if(pow(relative_pos[k][0],2)+pow(relative_pos[k][1],2) < RULE2_THRESHOLD)
 		{
 			for (j=0;j<2;j++) {
-    	   		dispersion[j] = -= 1/relative_pos[k][j]; 
+    	   		dispersion[j] -= 1/relative_pos[k][j]; 
 				}
 			}
 		}
@@ -368,7 +368,10 @@ int main(){
 	int bmsl, bmsr, sum_sensors;	// Braitenberg parameters
 	int i;				// Loop counter
 	int distances[NB_SENSORS];	// Array for the distance sensor readings
-	int max_sens;			// Store highest sensor value
+	int max_sens;
+	char *inbuffer;
+	int rob_nb;
+	float rob_x,rob_z,rob_theta;			// Store highest sensor value
 	
  	reset();			// Resetting the robot
  	initial_pos();      // initializing the robot's position 
@@ -434,7 +437,7 @@ int main(){
 			count++;
 			}
 			
-			wb_receiver_next_packet(receiver);
+			wb_receiver_next_packet(receiver2);
 		}
 		/// Compute self position
 		prev_my_position[0] = my_position[0];
