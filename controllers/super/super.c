@@ -88,7 +88,7 @@ void compute_fitness(float *p_t, float *p_mean) {
     }
     
     fit_o = sqrtf(re_o*re_o + im_o*im_o);
-    
+    printf("fit_o= %f\n",fit_o);
     // Distance between robots
     for(int i=0; i<FLOCK_SIZE; i++){
         mean_x += loc[i][0];
@@ -103,12 +103,12 @@ void compute_fitness(float *p_t, float *p_mean) {
     }
     
     fit_c = 1/(dist/FLOCK_SIZE + 1);
-    printf("%f",fit_c)
+    printf("fit_c = %f\n",fit_c);
     // Velocity of the team towards the goal direction
     float max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
                                           (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
     fit_s = (max_a < 0) ? 0 : max_a;
-
+    printf("fit_s = %f\n",fit_s);
     old_mean_x = mean_x;
     old_mean_z = mean_z;
     
