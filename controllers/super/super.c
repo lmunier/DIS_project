@@ -14,7 +14,6 @@
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
 
-
 #define MAX_SPEED         0.1287     	// Maximum speed [m/s]
 
 #define RULE1_THRESHOLD 0.2
@@ -78,8 +77,8 @@ void send_init_poses(void) {
 void compute_fitness(float *p_t, float *p_mean) {
     float mean_x = 0.0, mean_z = 0.0, old_mean_x = 0.0, old_mean_z = 0.0;
     float dist = 0.0;
-    float fit_c, fit_o, fit_s;
-    static float im_o, re_o;
+    float fit_c = 0.0, fit_o = 0.0, fit_s = 0.0;
+    float im_o = 0.0, re_o = 0.0;
     
     // Orientation between robots
     for(int i=0; i<FLOCK_SIZE; i++){
@@ -87,8 +86,9 @@ void compute_fitness(float *p_t, float *p_mean) {
         im_o += sinf(loc[i][2]);
     }
     
-    fit_o = sqrtf(re_o*re_o + im_o*im_o);
+    fit_o = sqrtf(re_o*re_o + im_o*im_o)/FLOCK_SIZE;
     printf("fit_o= %f\n",fit_o);
+    
     // Distance between robots
     for(int i=0; i<FLOCK_SIZE; i++){
         mean_x += loc[i][0];
@@ -102,8 +102,9 @@ void compute_fitness(float *p_t, float *p_mean) {
         dist += sqrtf((loc[i][0] - mean_x)*(loc[i][0] - mean_x) + (loc[i][1] - mean_z)*(loc[i][1] - mean_z));
     }
     
-    fit_c = 1/(dist/FLOCK_SIZE + 1);
+    fit_c = 1/((dist/FLOCK_SIZE) + 1);
     printf("fit_c = %f\n",fit_c);
+    
     // Velocity of the team towards the goal direction
     float max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
                                           (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
