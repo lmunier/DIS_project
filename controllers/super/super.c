@@ -14,7 +14,7 @@
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
 
-#define MAX_SPEED         0.1287     	// Maximum speed [m/s]
+#define MAX_SPEED         6.28     	// Maximum speed [m/s]
 
 #define RULE1_THRESHOLD 0.2
 
@@ -24,7 +24,6 @@ WbFieldRef robs_rotation[FLOCK_SIZE];	// Robots rotation fields
 WbDeviceTag emitter;			// Single emitter
 
 float loc[FLOCK_SIZE][3];		// Location of everybody in the flock
-float speed[FLOCK_SIZE];                // Speed of everybody in the flock
 
 int offset;				// Offset of robots number
 float migrx, migrz;			// Migration vector
@@ -80,16 +79,7 @@ void compute_fitness(float *p_t, float *p_mean) {
     float fit_c = 0.0, fit_o = 0.0, fit_s = 0.0;
     float im_o = 0.0, re_o = 0.0;
     
-    // Orientation between robots
-    for(int i=0; i<FLOCK_SIZE; i++){
-        re_o += cosf(loc[i][2]);
-        im_o += sinf(loc[i][2]);
-    }
-    
-    fit_o = sqrtf(re_o*re_o + im_o*im_o)/FLOCK_SIZE;
-    printf("fit_o= %f\n",fit_o);
-    
-    // Distance between robots
+    // Compute center of mass of the flock (mean of position x and z)
     for(int i=0; i<FLOCK_SIZE; i++){
         mean_x += loc[i][0];
         mean_z += loc[i][1];
@@ -99,9 +89,19 @@ void compute_fitness(float *p_t, float *p_mean) {
     mean_z /= FLOCK_SIZE;
     
     for(int i=0; i<FLOCK_SIZE; i++){
+        // Compute sum of real and imaginary number for the orintation metric
+        re_o += cosf(loc[i][2]);
+        im_o += sinf(loc[i][2]);
+        
+        // Compute sum of distance for the cohesion metric
         dist += sqrtf((loc[i][0] - mean_x)*(loc[i][0] - mean_x) + (loc[i][1] - mean_z)*(loc[i][1] - mean_z));
     }
     
+    // Orientation between robots
+    fit_o = sqrtf(re_o*re_o + im_o*im_o)/FLOCK_SIZE;
+    printf("fit_o= %f\n",fit_o);
+    
+    // Distance between robots    
     fit_c = 1/((dist/FLOCK_SIZE) + 1);
     printf("fit_c = %f\n",fit_c);
     
@@ -113,29 +113,10 @@ void compute_fitness(float *p_t, float *p_mean) {
     old_mean_x = mean_x;
     old_mean_z = mean_z;
     
-    // Return performance metrix
+    // Return performance metrics
     *p_t = fit_c*fit_o*fit_s;
-    *p_mean = (*p_mean*(t-TIME_STEP) + *p_t)/t;
-
-    // Compute performance indices
-    // Based on distance of the robots compared to the threshold and the deviation from the perfect angle towards
-    // the migration goal
-    /*float angle_diff;
-    int i; int j;
+    *p_mean = ((*p_mean)*(t/TIME_STEP) + (*p_t))/(t/TIME_STEP + 1);
     
-    for (i=0;i<FLOCK_SIZE;i++) {
-        for (j=i+1;j<FLOCK_SIZE;j++) {	
-            // Distance measure for each pair ob robots
-            *fit_c += fabs(sqrtf(powf(loc[i][0]-loc[j][0],2)+powf(loc[i][1]-loc[j][1],2)));
-        }
-    
-        // Angle measure for each robot
-        angle_diff = fabsf(loc[i][2]-orient_migr);
-        *fit_o += angle_diff > M_PI ? 2*M_PI-angle_diff : angle_diff;
-    }
-    
-    *fit_c /= FLOCK_SIZE*(FLOCK_SIZE+1)/2;
-    *fit_o /= FLOCK_SIZE;*/
 }
 
 /*
@@ -167,7 +148,7 @@ int main(int argc, char *args[]) {
     send_init_poses();
 	
     // Compute reference fitness values
-    float p_t = 0.0, p_mean = 0.0;
+    static float p_t = 0.0, p_mean = 0.0;
     		
     for(;;) {
         wb_robot_step(TIME_STEP);
@@ -186,7 +167,7 @@ int main(int argc, char *args[]) {
             
             //Compute and normalize fitness values
             compute_fitness(&p_t, &p_mean);			
-        			
+        	 printf("p_t = %f \t p_mean = %f\n", p_t, p_mean);
         }
     		
         t += TIME_STEP;
