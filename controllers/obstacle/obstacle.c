@@ -69,8 +69,9 @@ float my_position[3];			// X, Z, Theta of the current robot
 float prev_my_position[3];		// X, Z, Theta of the current robot in the previous time step
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
-float migr[2] = {-25, 0};		// Migration vector
-char *robot_name;
+int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
+float migr[2] = {0,0};	        // Migration vector
+char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
