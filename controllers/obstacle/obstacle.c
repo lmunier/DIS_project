@@ -421,8 +421,8 @@ int main()
                 relative_pos[rob_nb][1] = rob_z,     // z-position
                 relative_pos[rob_nb][2] = rob_theta; // theta
                 
-                speed[rob_nb][0] = (1 / DELTA_T) * (relative_pos[rob_nb][0] - prev_relative_pos[rob_nb][0]);
-                speed[rob_nb][1] = (1 / DELTA_T) * (relative_pos[rob_nb][1] - prev_relative_pos[rob_nb][1]);
+                relative_speed[rob_nb][0] = (1 / DELTA_T) * (relative_pos[rob_nb][0] - prev_relative_pos[rob_nb][0]);
+                relative_speed[rob_nb][1] = (1 / DELTA_T) * (relative_pos[rob_nb][1] - prev_relative_pos[rob_nb][1]);
                 count++;
             }
 
@@ -437,8 +437,8 @@ int main()
 
         //process_received_ping_messages();
 
-        speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
-        speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
+        // speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
+        // speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
 
         // Reynold's rules with all previous info (updates the speed[][] table)
         reynolds_rules();
