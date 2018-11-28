@@ -74,8 +74,10 @@ void send_init_poses(void) {
  * Compute performance metric.
  */
 void compute_fitness(float *p_t, float *p_mean) {
-    float mean_x = 0.0, mean_z = 0.0, old_mean_x = 0.0, old_mean_z = 0.0;
-    float dist = 0.0;
+    float mean_x = 0.0, mean_z = 0.0;
+    static float old_mean_x = 0.0, old_mean_z = 0.0;
+    
+    float dist = 0.0, max_a = 0.0;
     float fit_c = 0.0, fit_o = 0.0, fit_s = 0.0;
     float im_o = 0.0, re_o = 0.0;
     
@@ -106,17 +108,18 @@ void compute_fitness(float *p_t, float *p_mean) {
     printf("fit_c = %f\n",fit_c);
     
     // Velocity of the team towards the goal direction
-    float max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
-                                          (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
+    max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
+                                    (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
+                                    
     fit_s = (max_a < 0) ? 0 : max_a;
     printf("fit_s = %f\n",fit_s);
-    old_mean_x = mean_x;
+    
+    old_mean_x = mean_x;            
     old_mean_z = mean_z;
     
     // Return performance metrics
     *p_t = fit_c*fit_o*fit_s;
     *p_mean = ((*p_mean)*(t/TIME_STEP) + (*p_t))/(t/TIME_STEP + 1);
-    
 }
 
 /*
@@ -125,7 +128,7 @@ void compute_fitness(float *p_t, float *p_mean) {
 int main(int argc, char *args[]) {
     char buffer[255];	// Buffer for sending data
     
-    if (argc == 4) { // Get parameters
+    /*if (argc == 4) { // Get parameters
         offset = atoi(args[1]);
         migrx = atof(args[2]);
         migrz = atof(args[3]);
@@ -142,7 +145,7 @@ int main(int argc, char *args[]) {
     
     if (orient_migr<0) {
         orient_migr+=2*M_PI; // Keep value within 0, 2pi
-    }
+    }*/
     
     reset();
     send_init_poses();
