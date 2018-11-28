@@ -73,7 +73,7 @@ float prev_my_position[3];  		// X, Z, Theta of the current robot in the previou
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {25,0};	        // Migration vector
+float migr[2] = {0,0};	        // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
@@ -212,7 +212,8 @@ void reynolds_rules() {
 	for(i=0 ; i<FLOCK_SIZE ; i++){
 		if(i==robot_id)
 			continue;
-		for (j=0;j<2;j++) {
+	for (j=0;j<2;j++) 
+	{
             rel_avg_speed[j] += relative_speed[i][j];
             rel_avg_loc[j] += relative_pos[i][j];
          }
