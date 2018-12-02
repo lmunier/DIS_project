@@ -147,11 +147,11 @@ int main(int argc, char *args[]) {
         orient_migr+=2*M_PI; // Keep value within 0, 2pi
     }*/
     
-    reset();
-    send_init_poses();
+    //reset();
+    //send_init_poses();
 	
     // Compute reference fitness values
-    static float p_t = 0.0, p_mean = 0.0;
+    /*static float p_t = 0.0, p_mean = 0.0;
     		
     for(;;) {
         wb_robot_step(TIME_STEP);
@@ -164,8 +164,8 @@ int main(int argc, char *args[]) {
                 loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
                 				
                 // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
-                sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
-                wb_emitter_send(emitter,buffer,strlen(buffer));				
+                //sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
+                //wb_emitter_send(emitter,buffer,strlen(buffer));				
             }
             
             //Compute and normalize fitness values
@@ -174,6 +174,6 @@ int main(int argc, char *args[]) {
         }
     		
         t += TIME_STEP;
-    }
+    }*/
 
 }
