@@ -46,7 +46,7 @@
 
 #define MIGRATION_WEIGHT 		(0.01 / 10)           // Wheight of attraction towards the common goal. default 0.01/10
 
-#define MIGRATORY_URGE 		0 		// Tells the robots if they should just go forward or move towards a specific migratory direction
+#define MIGRATORY_URGE 		1 		// Tells the robots if they should just go forward or move towards a specific migratory direction
 
 #define ABS(x) ((x >= 0) ? (x) : -(x))
 
@@ -70,7 +70,7 @@ float prev_my_position[3];		// X, Z, Theta of the current robot in the previous 
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {0,0};	        // Migration vector
+float migr[2] = {-50, 25};	           // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
@@ -277,7 +277,7 @@ void initial_pos(void)
             wb_robot_step(TIME_STEP);
 
         inbuffer = (char *)wb_receiver_get_data(receiver2);
-        sscanf(inbuffer, "%d#%f#%f#%f##%f#%f", &rob_nb, &rob_x, &rob_z, &rob_theta, &migr[0], &migr[1]);
+        sscanf(inbuffer, "%d#%f#%f#%f", &rob_nb, &rob_x, &rob_z, &rob_theta);
         // Only info about self will be taken into account at first.
         
         //robot_nb %= FLOCK_SIZE;
@@ -371,7 +371,7 @@ int main()
 
     reset();	             // Resetting the robot
     initial_pos();                 // initializing the robot's position
-
+    
     msl = 0;
     msr = 0;
     max_sens = 0;
@@ -399,7 +399,7 @@ int main()
         bmsr /= MIN_SENS;
         bmsl += 66;
         bmsr += 72;
-        
+
         /* Send and get information */
         //send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
@@ -442,9 +442,13 @@ int main()
 
         // Reynold's rules with all previous info (updates the speed[][] table)
         reynolds_rules();
-
+        
+        msl = speed[robot_id][0];
+        msr = speed[robot_id][1];
+        
         // Compute wheels speed from reynold's speed
         compute_wheel_speeds(&msl, &msr);
+
 
         // Adapt speed instinct to distance sensor values
         if (sum_sensors > NB_SENSORS * MIN_SENS){
