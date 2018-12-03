@@ -13,6 +13,7 @@
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
+//#define METRICS
 
 #define MAX_SPEED         6.28     	// Maximum speed [m/s]
 
@@ -101,18 +102,27 @@ void compute_fitness(float *p_t, float *p_mean) {
     
     // Orientation between robots
     fit_o = sqrtf(re_o*re_o + im_o*im_o)/FLOCK_SIZE;
-    printf("fit_o= %f\n",fit_o);
+    
+    #ifdef METRICS
+        printf("fit_o= %f\n",fit_o);
+    #endif
     
     // Distance between robots    
     fit_c = 1/((dist/FLOCK_SIZE) + 1);
-    printf("fit_c = %f\n",fit_c);
+    
+    #ifdef METRICS
+        printf("fit_c = %f\n",fit_c);
+    #endif
     
     // Velocity of the team towards the goal direction
     max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
                                     (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
                                     
     fit_s = (max_a < 0) ? 0 : max_a;
-    printf("fit_s = %f\n",fit_s);
+    
+    #ifdef METRICS
+        printf("fit_s = %f\n",fit_s);
+    #endif
     
     old_mean_x = mean_x;            
     old_mean_z = mean_z;
@@ -164,13 +174,16 @@ int main(int argc, char *args[]) {
                 loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
                 				
                 // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
-                sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
+                sprintf(buffer,"%1d#%f#%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2]);
                 wb_emitter_send(emitter,buffer,strlen(buffer));				
             }
             
             //Compute and normalize fitness values
-            compute_fitness(&p_t, &p_mean);			
-        	 printf("p_t = %f \t p_mean = %f\n", p_t, p_mean);
+            compute_fitness(&p_t, &p_mean);
+            
+            #ifdef METRICS	
+                printf("p_t = %f \t p_mean = %f\n", p_t, p_mean);
+            #endif
         }
     		
         t += TIME_STEP;
