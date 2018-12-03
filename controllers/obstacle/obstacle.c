@@ -378,28 +378,6 @@ int main()
 	
     // Forever
     for (;;){
-        bmsl = 0;
-        bmsr = 0;
-        sum_sensors = 0;
-        max_sens = 0;
-
-        /* Braitenberg */
-        for (int i = 0; i < NB_SENSORS; i++){
-            distances[i] = wb_distance_sensor_get_value(ds[i]);             // Read sensor values
-            sum_sensors += distances[i];                                    // Add up sensor values
-            max_sens = (max_sens > distances[i]) ? max_sens : distances[i]; // Check if new highest sensor value
-
-            // Weighted sum of distance sensor values for Braitenburg vehicle
-            bmsr += e_puck_matrix[i] * distances[i];
-            bmsl += e_puck_matrix[i + NB_SENSORS] * distances[i];
-        }
-
-        // Adapt Braitenberg values (empirical tests)
-        bmsl /= MIN_SENS;
-        bmsr /= MIN_SENS;
-        bmsl += 66;
-        bmsr += 72;
-
         /* Send and get information */
         //send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
@@ -448,17 +426,6 @@ int main()
         
         // Compute wheels speed from reynold's speed
         compute_wheel_speeds(&msl, &msr);
-
-
-        // Adapt speed instinct to distance sensor values
-        if (sum_sensors > NB_SENSORS * MIN_SENS){
-            msl -= msl * max_sens / (2 * MAX_SENS);
-            msr -= msr * max_sens / (2 * MAX_SENS);
-        }
-
-        // Add Braitenberg
-        msl += bmsl;
-        msr += bmsr;
 
         /*Webots 2018b*/
         // Set speed
