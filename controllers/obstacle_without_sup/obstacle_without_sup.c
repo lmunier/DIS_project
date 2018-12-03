@@ -29,13 +29,13 @@
 /*Webots 2018b*/
 #define MAX_SPEED_WEB      6.28    // Maximum speed webots
 /*Webots 2018b*/
-#define FLOCK_SIZE	  6	  // Size of flock
+#define FLOCK_SIZE	  5	  // Size of flock
 #define TIME_STEP	  64	  // [ms] Length of time step
 
 #define AXLE_LENGTH 		0.052	// Distance between wheels of robot (meters)
 #define SPEED_UNIT_RADS		0.00628	// Conversion factor from speed unit to radian per second
 #define WHEEL_RADIUS		0.0205	// Wheel radius (meters)
-#define DELTA_T			0.064	// Timestep (seconds)
+#define DELTA_T			2*0.064	// Timestep (seconds)
 
 
 #define RULE1_THRESHOLD     0.20   // Threshold to activate aggregation rule. default 0.20
@@ -48,7 +48,7 @@
 
 #define MIGRATION_WEIGHT    (0.01/10)   // Wheight of attraction towards the common goal. default 0.01/10
 
-#define MIGRATORY_URGE 		1 		// Tells the robots if they should just go forward or move towards a specific migratory direction
+#define MIGRATORY_URGE 1 // Tells the robots if they should just go forward or move towards a specific migratory direction
 
 #define ABS(x) ((x>=0)?(x):-(x))
 
@@ -73,17 +73,19 @@ float prev_my_position[3];  		// X, Z, Theta of the current robot in the previou
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {25, -25};	           // Migration vector
+float migr[2] = {25,0};	        // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
 
 struct robot{
   int ID;
+  int init;
   double distances[FLOCK_SIZE][2];
   double previousDistances[FLOCK_SIZE][2];
   double relAngle[FLOCK_SIZE];
   double speed[FLOCK_SIZE][2];
+  //double absSpeed[FLOCK_SIZE][2];        A faire?
 }myself;
 
 /*
@@ -128,14 +130,15 @@ static void reset()
          
 	for(i=0; i<FLOCK_SIZE; i++) 
 	{
-                	myself.distances[i][0] = 0;    //Initialize distance tab x
-                	myself.distances[i][1] = 0;    //Initialize distance tab y
+                	myself.distances[i][0] = 0;            //Initialize distance tab x
+                	myself.distances[i][1] = 0;            //Initialize distance tab y
                 	myself.previousDistances[i][0] = 0;    //Initialize distance tab x
-              		myself.previousDistances[i][1] = 0;    //Initialize distance tab y
-                	myself.relAngle[i] = 0;     //Initialize relative angle tab
-                	myself.speed[i][0] = 0;        //Initialize speed tab x
-                	myself.speed[i][1] = 0;        //Initialize speed tab y
-		initialized[i] = 0;		  // Set initialization to 0 (= not yet initialized)
+              	myself.previousDistances[i][1] = 0;    //Initialize distance tab y
+                	myself.relAngle[i] = 0;                //Initialize relative angle tab
+                	myself.speed[i][0] = 0;                //Initialize speed tab x
+                	myself.speed[i][1] = 0;                //Initialize speed tab y
+                	myself.init = 0;
+		initialized[i] = 0;		   //Set initialization to 0 (= not yet initialized)
 	}
   
         printf("Reset: robot %d\n",robot_id_u);
@@ -227,11 +230,13 @@ void reynolds_rules() {
 	
 	/* Compute averages over the whole flock */
 	for(i=0 ; i<FLOCK_SIZE ; i++){
-		if(i==robot_id)
+		if(i==myself.ID)
 			continue;
 		for (j=0;j<2;j++) {
-            rel_avg_speed[j] += relative_speed[i][j];
-            rel_avg_loc[j] += relative_pos[i][j];
+            //rel_avg_speed[j] += relative_speed[i][j];
+            //rel_avg_loc[j] += relative_pos[i][j];
+            rel_avg_speed[j] += myself.speed[i][j];
+            rel_avg_loc[j] += myself.distances[i][j];
          }
 	
 	}
@@ -247,13 +252,25 @@ void reynolds_rules() {
 	}
 
 	/* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
-	for (k=0;k<FLOCK_SIZE;k++) {
+	/*for (k=0;k<FLOCK_SIZE;k++) {
 		if (k != robot_id){ // Loop on flockmates only
 		// If neighbor k is too close (Euclidean distance)
 		if(pow(relative_pos[k][0],2)+pow(relative_pos[k][1],2) < RULE2_THRESHOLD)
 		{
 			for (j=0;j<2;j++) {
     	   		dispersion[j] -= 1/relative_pos[k][j]; 
+				}
+			}
+		}
+	}*/
+	
+	for (k=0;k<FLOCK_SIZE;k++) {
+		if (k != myself.ID){ // Loop on flockmates only
+		// If neighbor k is too close (Euclidean distance)
+		if(pow(myself.distances[k][0],2)+pow(myself.distances[k][1],2) < RULE2_THRESHOLD)
+		{
+			for (j=0;j<2;j++) {
+    	   		dispersion[j] -= 1/myself.distances[k][j]; 
 				}
 			}
 		}
@@ -267,8 +284,8 @@ void reynolds_rules() {
          //aggregation of all behaviors with relative influence determined by weights
          for (j=0;j<2;j++) 
 	{
-                 speed[robot_id][j] = cohesion[j] * RULE1_WEIGHT;
-                 speed[robot_id][j] +=  dispersion[j] * RULE2_WEIGHT;
+                 speed[robot_id][j] =   cohesion[j]    * RULE1_WEIGHT;
+                 speed[robot_id][j] +=  dispersion[j]  * RULE2_WEIGHT;
                  speed[robot_id][j] +=  consistency[j] * RULE3_WEIGHT;
          }
         speed[robot_id][1] *= -1; //y axis of webots is inverted
@@ -288,37 +305,33 @@ void reynolds_rules() {
 /*
  * Initialize robot's position
  */
-void initial_pos(void)
-{
-    char *inbuffer;
-    int rob_nb;
-    float rob_x, rob_z, rob_theta; // Robot position and orientation
+void initial_pos(void){
 
-    while (initialized[robot_id] == 0){
-        // wait for message
-        while (wb_receiver_get_queue_length(receiver2) == 0)
-            wb_robot_step(TIME_STEP);
+	char *inbuffer;	
+	int rob_nb;
+	float rob_x, rob_z, rob_theta; // Robot position and orientation
 
-        inbuffer = (char *)wb_receiver_get_data(receiver2);
-        sscanf(inbuffer, "%d#%f#%f#%f", &rob_nb, &rob_x, &rob_z, &rob_theta);
-        // Only info about self will be taken into account at first.
-        
-        //robot_nb %= FLOCK_SIZE;
-        
-        if (rob_nb == robot_id){
-            // Initialize self position
-            relative_pos[rob_nb][0] = rob_x;	     // x-position
-            relative_pos[rob_nb][1] = rob_z;	     // z-position
-            relative_pos[rob_nb][2] = rob_theta; // theta
-            
-            prev_relative_pos[rob_nb][0] = relative_pos[rob_nb][0];
-            prev_relative_pos[rob_nb][1] = relative_pos[rob_nb][1];
-            
-            initialized[rob_nb] = 1;             // initialized = true
-        }
-        
-        wb_receiver_next_packet(receiver2);
-    }
+	while (initialized[robot_id] == 0) {
+		
+		// wait for message
+		while (wb_receiver_get_queue_length(receiver2) == 0)	wb_robot_step(TIME_STEP);
+		
+		inbuffer = (char*) wb_receiver_get_data(receiver2);
+		sscanf(inbuffer,"%d#%f#%f#%f##%f#%f",&rob_nb,&rob_x,&rob_z,&rob_theta, &migr[0], &migr[1]);
+		// Only info about self will be taken into account at first.
+    
+                if (rob_nb == robot_id) 
+		{
+			// Initialize self position
+			relative_pos[rob_nb][0] = rob_x; 		// x-position
+			relative_pos[rob_nb][1] = rob_z; 		// z-position
+			relative_pos[rob_nb][2] = rob_theta; 		// theta
+			prev_relative_pos[rob_nb][0] = relative_pos[rob_nb][0];
+			prev_relative_pos[rob_nb][1] = relative_pos[rob_nb][1];
+			initialized[rob_nb] = 1; 		// initialized = true
+		}		
+		wb_receiver_next_packet(receiver2);
+	}	
 }
 
 /*
@@ -329,8 +342,14 @@ void initial_pos(void)
 void send_ping(void)  
 {
         char out[10];
+        out[0] = myself.ID;
+        
+        if(myself.init){
+          
+        }else{
+        
+        }
         strcpy(out,robot_name);  // in the ping message we send the name of the robot.
-        // printf("%s \n", robot_name);
         wb_emitter_send(emitter2,out,strlen(out)+1); 
 }
 
@@ -348,7 +367,8 @@ void process_received_ping_messages(void)
         double theta;
         double range;
         char *inbuffer;	// Buffer for the receiver node
-        int other_robot_id;
+        int emmiter_id;
+        printf("Queue length: %d\n",wb_receiver_get_queue_length(receiver2));
         
         while (wb_receiver_get_queue_length(receiver2) > 0) {
                   
@@ -358,10 +378,6 @@ void process_received_ping_messages(void)
 		message_rssi = wb_receiver_get_signal_strength(receiver2);                   //Get strength
 		double y = message_direction[2];                                             //X direction
 		double x = message_direction[1];                                             //Y direction
-                  printf("%s \n", inbuffer);
-
-
-
 
 
                   theta =	-atan2(y,x);
@@ -369,31 +385,33 @@ void process_received_ping_messages(void)
 		range = sqrt((1/message_rssi));
 		
 		
-		
                   //Processing of the message
                   //Identification of the sender
-		other_robot_id = (int)(inbuffer[5]-'0');                                    //Get sender ID
-		printf("Rec : %d, emm: %d \n", robot_id, other_robot_id);
+		emmiter_id = (inbuffer[5]-'0');                                    //Get emmiter ID
+		printf("Rec : %d, emm: %d \n", robot_id, emmiter_id);
 		
 		//Computation of the distances
-		prev_relative_pos[other_robot_id][0] = relative_pos[other_robot_id][0];     //Store previous X relative distances
-		prev_relative_pos[other_robot_id][1] = relative_pos[other_robot_id][1];     //Store previous Y relative distances
-		relative_pos[other_robot_id][0] = range*cos(theta);                         //Compute relative X pos
-		relative_pos[other_robot_id][1] = -1.0 * range*sin(theta);                  //Compute relative Y pos
+		prev_relative_pos[emmiter_id][0] = relative_pos[emmiter_id][0];     //Store previous X relative distances
+		prev_relative_pos[emmiter_id][1] = relative_pos[emmiter_id][1];     //Store previous Y relative distances
+		relative_pos[emmiter_id][0] = range*cos(theta);                         //Compute relative X pos
+		relative_pos[emmiter_id][1] = -1.0 * range*sin(theta);                  //Compute relative Y pos
 
                   //Computation of the speeds
-		relative_speed[other_robot_id][0] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][0]-prev_relative_pos[other_robot_id][0]);  //Compute relative X speed
-		relative_speed[other_robot_id][1] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][1]-prev_relative_pos[other_robot_id][1]);	 //Compute relative Y speed	
+		relative_speed[emmiter_id][0] = 1.0*(1/DELTA_T)*(relative_pos[emmiter_id][0]-prev_relative_pos[emmiter_id][0]);  //Compute relative X speed
+		relative_speed[emmiter_id][1] = 1.0*(1/DELTA_T)*(relative_pos[emmiter_id][1]-prev_relative_pos[emmiter_id][1]);  //Compute relative Y speed	
 		
 		
 		//Use of the structure
-		myself.relAngle[other_robot_id] = -atan2(y,x);// + my_position[2];
+		myself.relAngle[emmiter_id] = -atan2(y,x);                                     //Store relative angle
 		
-		myself.previousDistances[other_robot_id][0] = myself.distances[other_robot_id][0];
-		myself.previousDistances[other_robot_id][1] = myself.distances[other_robot_id][1];
+		myself.previousDistances[emmiter_id][0] = myself.distances[emmiter_id][0];     //Store previous X relative distances
+		myself.previousDistances[emmiter_id][1] = myself.distances[emmiter_id][1];     //Store previous Y relative distances
 		
-		myself.distances[other_robot_id][0] = relative_pos[other_robot_id][0];
-		myself.distances[other_robot_id][1] = relative_pos[other_robot_id][1];
+		myself.distances[emmiter_id][0] = relative_pos[emmiter_id][0];                 //Compute relative X pos
+		myself.distances[emmiter_id][1] = relative_pos[emmiter_id][1];                 //Compute relative Y pos
+		
+		myself.speed[emmiter_id][0] = (1.0/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]);
+		myself.speed[emmiter_id][1] = (1.0/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]);
 		
 		wb_receiver_next_packet(receiver2);
 	}
@@ -408,21 +426,17 @@ int main(){
 	/*Webots 2018b*/
 	int bmsl, bmsr, sum_sensors;	// Braitenberg parameters
 	int i;				// Loop counter
-	int distances[NB_SENSORS];	// Array for the distance sensor readings
+	int distances[NB_SENSORS];	         // Array for the distance sensor readings
 	int max_sens;
-	char *inbuffer;
-	int rob_nb;
-	float rob_x,rob_z,rob_theta;			// Store highest sensor value
 	
- 	reset();			// Resetting the robot
+ 	reset();			         // Resetting the robot
  	
- 	
- 	wb_robot_step(TIME_STEP+robot_id*DELTA_T/);
- 	
+ 	//Shifting the time of each robots
+ 	wb_robot_step(TIME_STEP+((robot_id*DELTA_T)/FLOCK_SIZE));
  	send_ping();
- 	wb_robot_step(FLOCK_SIZE);
- 	initial_pos();      // initializing the robot's position 
-
+ 	printf("Robot: %d\n", robot_id);
+ 	process_received_ping_messages();
+ 	
 	msl = 0; msr = 0; 
 	max_sens = 0; 
 	
@@ -453,7 +467,7 @@ int main(){
 		send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 	
 	/* Get information */
-		int count = 0;
+		/*int count = 0;
 		while (wb_receiver_get_queue_length(receiver2) > 0 && count < FLOCK_SIZE) 
 		{
 			inbuffer = (char*) wb_receiver_get_data(receiver2);
@@ -488,14 +502,14 @@ int main(){
 		}
 		/// Compute self position
 		prev_my_position[0] = my_position[0];
-		prev_my_position[1] = my_position[1];
+		prev_my_position[1] = my_position[1];*/
 		
 		update_self_motion(msl,msr);
 		
 		process_received_ping_messages();
 
-		speed[robot_id][0] = (1/DELTA_T)*(my_position[0]-prev_my_position[0]);
-		speed[robot_id][1] = (1/DELTA_T)*(my_position[1]-prev_my_position[1]);
+		/*speed[robot_id][0] = (1/DELTA_T)*(my_position[0]-prev_my_position[0]);
+		speed[robot_id][1] = (1/DELTA_T)*(my_position[1]-prev_my_position[1]);*/
     
 		// Reynold's rules with all previous info (updates the speed[][] table)
 		reynolds_rules();
