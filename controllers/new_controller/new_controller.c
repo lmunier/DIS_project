@@ -124,6 +124,33 @@ void limit(int *number, int limit)
 		*number = -limit;
 }
 
+void update_self_motion(int msl, int msr)
+{
+	float theta = myself.my_position[2];
+
+    	// Compute deltas of the robot
+    	float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;	// Compute the translational displacement of the right wheel
+    	float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;	// Compute the translational displacement of the left wheel
+	
+    	float du = (dr + dl) / 2.0;						// Compute the translational displacement of the epuck
+    	float dtheta = (dr - dl) / AXE_LENGTH;					// Compute the angular displacement of the right wheel
+
+    	// Compute deltas in the environment
+    	float dx = -du * sinf(theta);						// Compute the X translational displacement of the epuck
+    	float dz = -du * cosf(theta);						// Compute the Y translational displacement of the epuck
+
+    	// Update position
+    	myself.my_position[0] += dx;
+    	myself.my_position[1] += dz;
+    	myself.my_position[2] += dtheta;
+
+    	// Keep orientation within 0, 2pi
+    	if (myself.my_position[2] > 2 * M_PI)
+       		myself.my_position[2] -= 2.0 * M_PI;
+    	if (myself.my_position[2] < 0)
+        	myself.my_position[2] += 2.0 * M_PI;
+}
+
 void compute_wheel_speeds(int *msl, int *msr)
 {
     	float x = myself.speed[myself.ID][0] * cosf(myself.my_position[2]) + myself.speed[myself.ID][1] * sinf(myself.my_position[2]);    // Speed X in robot coordinates
@@ -137,9 +164,11 @@ void compute_wheel_speeds(int *msl, int *msr)
 
     	// Compute forward control
     	float u = Ku * range * cosf(bearing);
+	// ADD PID CONTROL?
     
 	// Compute rotational control
     	float w = Kw * bearing;
+	// ADD PID CONTROL?
 
     	// Convert to wheel speeds!
     	*msl = (u - AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
@@ -268,19 +297,26 @@ void process_received_ping_messages(void)
 
 int main(){
 	
-	int msl, msr; 								// Wheel speeds
+	int msl = 0, msr = 0; 							// Wheel speeds
 
-	reset();
+	reset();								// Reset the robot
 	
 	wb_robot_step(TIME_STEP+((myself.ID*DELTA_T)/FLOCK_SIZE));		// Shift in time the robots depending on their ID
 	
 	for(;;){
 		
 		send_ping();							// Send ping message
+
+		// Compute self position
+        	myself.my_previous_position[0] = myself.my_position[0];
+        	myself.my_previous_position[1] = myself.my_position[1];
+        
+        	update_self_motion(msl, msr);
+
 		process_received_ping_messages();				// Process the received messages
 
-		//myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
-		//myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
+		myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
+		myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
 
 		// Reynold's rules with all previous info (updates the speed[][] table)
         	reynolds_rules();
