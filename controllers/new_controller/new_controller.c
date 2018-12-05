@@ -13,7 +13,11 @@
 
 #define FLOCK_SIZE		5		// Number of robots
 #define TIME_STEP 		2*0.64		// Step duration time
-#define DELTA_T			2*0.064	         // Timestep (seconds)
+#define DELTA_T			2*0.064	        // Timestep (seconds)
+
+#define AXE_LENGTH 		0.052		// Distance between wheels of robot (meters)
+#define SPEED_UNIT_RADS 	0.00628 	// Conversion factor from speed unit to radian per second
+#define WHEEL_RADIUS 		0.0205		// Wheel radius (meters)
 
 #define NB_SENSORS		8		// Number of IR sensors
 #define MIN_SENS          	350     	// Minimum sensibility value
@@ -39,20 +43,22 @@ WbDeviceTag receiver2;				// Handle for the receiver node
 WbDeviceTag emitter2;				// Handle for the emitter node
 
 struct robot{
-  int ID;					// ID of myself
-  int init;					// Control if initialized, 0=not, 1=yes
-  double distances[FLOCK_SIZE][2];		// Store the distances between myself and other robots
-  double previousDistances[FLOCK_SIZE][2];	// Store the previous distances between myself and other robots
-  double relAngle[FLOCK_SIZE];			// Store the relative angle of the other robots
-  double speed[FLOCK_SIZE][2];			// Store the relative speed of the other robots
+	int ID;						// ID of myself
+	int init;					// Control if initialized, 0=not, 1=yes
+	double distances[FLOCK_SIZE][2];		// Store the distances between myself and other robots
+	double previousDistances[FLOCK_SIZE][2];	// Store the previous distances between myself and other robots
+	double relAngle[FLOCK_SIZE];			// Store the relative angle of the other robots
+	double speed[FLOCK_SIZE][2];			// Store the relative speed of the other robots and the speed of myself
+	double my_position[3];				// Initial position of myself: X, Z and theta
+	double my_previous_position[3];			// Initial position of myself: X, Z and theta
+	double migr[2];					// Position for the migratory urge
   //double absSpeed[FLOCK_SIZE][2];        A faire?
 }myself;
 
 
 static void reset(){
-
-         char* robot_name;
-         
+	
+	char* robot_name;         
          
 	wb_robot_init();
 
@@ -67,9 +73,8 @@ static void reset(){
         
         int i;
 	char s[4]="ps0";
-	for(i=0; i<NB_SENSORS;i++) {
+	for(i=0;i<NB_SENSORS;i++) {
 		ds[i]=wb_robot_get_device(s);				// the device name is specified in the world file
-		printf("%d\n",ds[i]);
 		s[2]++;							// increases the device number
 	}
 
@@ -77,7 +82,7 @@ static void reset(){
 
 	for(i=0;i<NB_SENSORS;i++)
 	{
-          wb_distance_sensor_enable(ds[i],64);
+		wb_distance_sensor_enable(ds[i],64);
 	}
 
 	wb_receiver_enable(receiver2,64);
@@ -88,26 +93,132 @@ static void reset(){
 
 	for(i=0;i<FLOCK_SIZE;i++) 
 	{
-		myself.distances[i][0] = 0;            //Initialize distance tab X
-               	myself.distances[i][1] = 0;            //Initialize distance tab Y
-               	myself.previousDistances[i][0] = 0;    //Initialize distance tab X
-              	myself.previousDistances[i][1] = 0;    //Initialize distance tab Y
-               	myself.relAngle[i] = 0;                //Initialize relative angle tab
-               	myself.speed[i][0] = 0;                //Initialize speed tab X
-              	myself.speed[i][1] = 0;                //Initialize speed tab Y
+		myself.distances[i][0] = 0;            	//Initialize distance tab X
+               	myself.distances[i][1] = 0;            	//Initialize distance tab Y
+               	myself.previousDistances[i][0] = 0;   	//Initialize distance tab X
+              	myself.previousDistances[i][1] = 0;   	//Initialize distance tab Y
+               	myself.relAngle[i] = 0;                	//Initialize relative angle tab
+               	myself.speed[i][0] = 0;                	//Initialize speed tab X
+              	myself.speed[i][1] = 0;                	//Initialize speed tab Y
            	myself.init = 0;
 	}
+
+	myself.my_position[0] = 0;			// Set initial X position of myself to 0
+	myself.my_position[1] = 0;			// Set initial Y position of myself to 0
+	myself.my_position[2] = 0;			// Set initial theta position of myself to 0
+	myself.my_previous_position[0] = 0;			// Set previous X position of myself to 0
+	myself.my_previous_position[1] = 0;			// Set previous Y position of myself to 0
+	myself.my_previous_position[2] = 0;			// Set previous theta position of myself to 0
   
         printf("Reset: robot %d\n",myself.ID);
         
-        //migr[0] = 0;
-        //migr[1] = 0;
+        myself.migr[0] = 0;				// Set the X migratory urge
+        myself.migr[1] = 0;				// Set the Y migratory urge
+}
+
+void limit(int *number, int limit)
+{
+	if (*number > limit)
+		*number = limit;
+    	if (*number < -limit)
+		*number = -limit;
+}
+
+void compute_wheel_speeds(int *msl, int *msr)
+{
+    	float x = myself.speed[myself.ID][0] * cosf(myself.my_position[2]) + myself.speed[myself.ID][1] * sinf(myself.my_position[2]);    // Speed X in robot coordinates
+    	float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);   // Speed Z in robot coordinates
+	
+    	float Ku = 0.2;                        // Forward control coefficient
+    	float Kw = 1;                          // Rotational control coefficient
+    	// float range = sqrtf(x * x + z * z);    // Distance to the wanted position
+	float range = sqrtf(x * x + z * z);    // Norm of the wanted speed vector in robot coordinate
+    	float bearing = -atan2(x, z);          // Orientation of the wanted speed vector
+
+    	// Compute forward control
+    	float u = Ku * range * cosf(bearing);
+    
+	// Compute rotational control
+    	float w = Kw * bearing;
+
+    	// Convert to wheel speeds!
+    	*msl = (u - AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
+    	*msr = (u + AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
+	
+    	limit(msl, MAX_SPEED);
+   	limit(msr, MAX_SPEED);
+}
+
+void reynolds_rules()
+{
+	int i, j, k;                     // Loop counters
+    	float rel_avg_loc[2] = {0, 0};   // Flock average positions
+    	float rel_avg_speed[2] = {0, 0}; // Flock average speeds
+    	float cohesion[2] = {0, 0};
+    	float dispersion[2] = {0, 0};
+    	float consistency[2] = {0, 0};
+
+    	/* Compute averages over the whole flock */
+    	for (i=0;i<FLOCK_SIZE;i++){
+
+		if (i == myself.ID)
+            		continue;
+
+        	for (j = 0; j < 2; j++){
+           		rel_avg_speed[j] += myself.speed[i][j];
+            		rel_avg_loc[j] += myself.distances[i][j];
+        	}
+    	}
+	
+    	for (j=0;j<2;j++){
+        	rel_avg_speed[j] /= FLOCK_SIZE - 1;
+        	rel_avg_loc[j] /= FLOCK_SIZE - 1;
+    	}
+	
+    	/* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
+    	for (j=0;j<2;j++){
+        	cohesion[j] = rel_avg_loc[j];
+    	}
+
+    	/* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
+    	for (k=0;k<FLOCK_SIZE;k++){
+        	if (k != myself.ID){ // Loop on flockmates only
+            		// If neighbor k is too close (Euclidean distance)
+            		if ((myself.distances[k][0]*myself.distances[k][0] + myself.distances[k][1]*myself.distances[k][1]) < RULE2_THRESHOLD){
+                		for (j=0;j<2;j++){
+                    			dispersion[j] -= 1/myself.distances[k][j];
+                		}
+            		}
+        	}
+    	}
+
+    	/* Rule 3 - Consistency/Alignment: match the speeds of flockmates */
+    	for (j=0;j<2;j++){
+        	consistency[j] = rel_avg_speed[j];
+    	}
+
+    	//aggregation of all behaviors with relative influence determined by weights
+    	for (j=0;j<2;j++){
+        	myself.speed[myself.ID][j] =   cohesion[j] 	* RULE1_WEIGHT;
+        	myself.speed[myself.ID][j] +=  dispersion[j] 	* RULE2_WEIGHT;
+        	myself.speed[myself.ID][j] +=  consistency[j] 	* RULE3_WEIGHT;
+    	}
+    	myself.speed[myself.ID][1] *= -1; 								//y axis of webots is inverted
+
+    	//move the robot according to some migration rule
+    	if (MIGRATORY_URGE == 0){
+        	myself.speed[myself.ID][0] += 0.01 * cos(myself.my_position[2] + M_PI / 2);
+        	myself.speed[myself.ID][1] += 0.01 * sin(myself.my_position[2] + M_PI / 2);
+    	} else {
+        	myself.speed[myself.ID][0] += (myself.migr[0] - myself.my_position[0]) * MIGRATION_WEIGHT;
+        	myself.speed[myself.ID][1] -= (myself.migr[1] - myself.my_position[1]) * MIGRATION_WEIGHT; 		//y axis of webots is inverted
+    	}	
 }
 
 void send_ping(void)  
 {
         char out[10];
-        sprintf(out,"%d",myself.ID);			// In the ping message we send the name of the robot.
+        sprintf(out,"%d",myself.ID);				// In the ping message we send the name of the robot.
         wb_emitter_send(emitter2,out,strlen(out)+1); 		// Send Message
 }
 
@@ -136,8 +247,8 @@ void process_received_ping_messages(void)
 		emmiter_id = (inbuffer[0]-'0');                                    		// Get emmiter ID
 		printf("Rec : %d, emm: %d \n", myself.ID, emmiter_id);
                 
-                myself.relAngle[emmiter_id] = -atan2(y,x);							// Find the relative theta
-                abs_theta = myself.relAngle[emmiter_id];// + my_position[2]; 						// Find the absolute theta;
+                myself.relAngle[emmiter_id] = -atan2(y,x);					// Find the relative theta
+                abs_theta = myself.relAngle[emmiter_id] + myself.my_position[2]; 		// Find the absolute theta;
 		range = sqrt((1/message_rssi));							// Find the range of the message
 		
                 // Processing of the message
@@ -156,6 +267,8 @@ void process_received_ping_messages(void)
 }
 
 int main(){
+	
+	int msl, msr; 								// Wheel speeds
 
 	reset();
 	
@@ -165,6 +278,20 @@ int main(){
 		
 		send_ping();							// Send ping message
 		process_received_ping_messages();				// Process the received messages
+
+		//myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
+		//myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
+
+		// Reynold's rules with all previous info (updates the speed[][] table)
+        	reynolds_rules();
+
+		// Compute wheels speed from reynold's speed
+        	compute_wheel_speeds(&msl, &msr);
+
+		msl = msl * MAX_SPEED / 1000;
+		msr = msr * MAX_SPEED / 1000;
+		wb_motor_set_velocity(left_motor, msl);
+		wb_motor_set_velocity(right_motor, msr);
 
 		wb_robot_step(TIME_STEP);					// Wait a time step
 	}
