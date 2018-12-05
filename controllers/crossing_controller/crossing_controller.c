@@ -28,7 +28,7 @@
 /*Webots 2018b*/
 #define MAX_SPEED_WEB 			6.28 		// Maximum speed webots
 /*Webots 2018b*/
-#define FLOCK_SIZE 			5 		// Size of flock
+#define FLOCK_SIZE 			5		// Size of flock
 #define TIME_STEP 			64 		// [ms] Length of time step
 
 #define AXLE_LENGTH 			0.052		// Distance between wheels of robot (meters)
@@ -70,7 +70,7 @@ float prev_my_position[3];		// X, Z, Theta of the current robot in the previous 
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {50, -25};	           // Migration vector
+float migr[2] = {500, -25};	           // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
