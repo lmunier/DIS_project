@@ -21,6 +21,8 @@
 #include <webots/emitter.h>
 #include <webots/receiver.h>
 
+#define OBSTACLE                            300
+#define FORWARD_SPEED                       500
 #define NB_SENSORS 			8  		// Number of distance sensors
 #define MIN_SENS 			350  		// Minimum sensibility value
 #define MAX_SENS 			4096 		// Maximum sensibility value
@@ -55,8 +57,6 @@ WbDeviceTag left_motor;  		//handler for left wheel of the robot
 WbDeviceTag right_motor; 		//handler for the right wheel of the robot
 /*Webots 2018b*/
 
-int e_puck_matrix[16] = {17, 29, 34, 10, 8, -38, -56, -76, -72, -58, -36, 8, 10, 36, 28, 18}; // for obstacle avoidance
-
 WbDeviceTag ds[NB_SENSORS]; 		// Handle for the infrared distance sensors
 WbDeviceTag receiver2;			// Handle for the receiver node
 WbDeviceTag emitter2;			// Handle for the emitter node
@@ -70,11 +70,17 @@ float prev_my_position[3];		// X, Z, Theta of the current robot in the previous 
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {50, -25};	           // Migration vector
+
+float migr[2] = {-500, 25};	           // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
+
+float ds_value[NB_SENSORS]; //distance values for each sensor
+
+// Enume for our state machine
+typedef enum {REYNOLD, BRAITENBERG} STATE;
 
 /*
  * Reset the robot's devices and get its ID
@@ -109,7 +115,7 @@ static void reset()
 
     wb_receiver_enable(receiver2, 64);
 
-    //Reading the robot's name. Pay attention to name specification when adding robots to the simulation!
+    //Reading the robot'ds[i]s name. Pay attention to name specification when adding robots to the simulation!
     sscanf(robot_name, "epuck%d", &robot_id_u);      // read robot id from the robot's name
     robot_id = robot_id_u % FLOCK_SIZE;	         // normalize between 0 and FLOCK_SIZE-1
 
@@ -125,9 +131,9 @@ static void reset()
  */
 void limit(int *number, int limit)
 {
-    if (*number > limit)
+    if (*number >= limit)
         *number = limit;
-    if (*number < -limit)
+    if (*number <= -limit)
         *number = -limit;
 }
 
@@ -182,7 +188,7 @@ void compute_wheel_speeds(int *msl, int *msr)
     // Compute forward control
     float u = Ku * range * cosf(bearing);
     
-	// Compute rotational control
+    // Compute rotational control
     float w = Kw * bearing;
 
     // Convert to wheel speeds!
@@ -259,6 +265,33 @@ void reynolds_rules()
     } else {
         speed[robot_id][0] += (migr[0] - my_position[0]) * MIGRATION_WEIGHT;
         speed[robot_id][1] -= (migr[1] - my_position[1]) * MIGRATION_WEIGHT; //y axis of webots is inverted
+    }
+}
+
+/*
+ *  Update speed according to Braitenberg's vehicle
+ */
+
+void braitenberg(int i_sensor_max)
+{
+    static double ds_coeff[NB_SENSORS] = {0.8, 0.3, 0.2, 0.1,
+                                          0.1, 0.2, 0.3, 0.8}; //coefficient values for each sensor
+  
+    // Controller with Braitenberg implementation
+    if (i_sensor_max >= 0 && i_sensor_max < 2) { // we detected an obstacle with right sensors
+        for(int i = 0; i < NB_SENSORS/2; i++){
+            speed[robot_id][0] -= ds_coeff[i]*ds_value[i];
+            speed[robot_id][1] += ds_coeff[i]*ds_value[i];
+        }
+        
+    } else if (i_sensor_max > 5 && i_sensor_max <= 7) { // we detected an obstacle with left sensors
+        for(int i = 0; i < NB_SENSORS/2; i++){
+            speed[robot_id][0] += ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
+            speed[robot_id][1] -= ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
+        }
+    } else { // Go forward
+        speed[robot_id][0] = FORWARD_SPEED;
+        speed[robot_id][1] = FORWARD_SPEED;
     }
 }
 
@@ -359,47 +392,26 @@ void initial_pos(void)
 int main()
 {
     int msl, msr; // Wheel speeds
+    
     /*Webots 2018b*/
     float msl_w, msr_w;
     /*Webots 2018b*/
-    int bmsl, bmsr, sum_sensors;   // Braitenberg parameters
-    int distances[NB_SENSORS];     // Array for the distance sensor readings
-    int max_sens;
+    
+    int i, i_sensor_max = -1;
     char *inbuffer;
     int rob_nb;
     float rob_x, rob_z, rob_theta; // Store highest sensor value
+    
+    STATE state = REYNOLD;
 
     reset();	             // Resetting the robot
     initial_pos();                 // initializing the robot's position
     
     msl = 0;
     msr = 0;
-    max_sens = 0;
 	
     // Forever
     for (;;){
-        bmsl = 0;
-        bmsr = 0;
-        sum_sensors = 0;
-        max_sens = 0;
-
-        /* Braitenberg */
-        /*for (int i = 0; i < NB_SENSORS; i++){
-            distances[i] = wb_distance_sensor_get_value(ds[i]);             // Read sensor values
-            sum_sensors += distances[i];                                    // Add up sensor values
-            max_sens = (max_sens > distances[i]) ? max_sens : distances[i]; // Check if new highest sensor value
-
-            // Weighted sum of distance sensor values for Braitenburg vehicle
-            bmsr += e_puck_matrix[i] * distances[i];
-            bmsl += e_puck_matrix[i + NB_SENSORS] * distances[i];
-        }
-
-        // Adapt Braitenberg values (empirical tests)
-        bmsl /= MIN_SENS;
-        bmsr /= MIN_SENS;
-        bmsl += 66;
-        bmsr += 72;*/
-
         /* Send and get information */
         //send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
@@ -439,31 +451,59 @@ int main()
 
         // speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
         // speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
-
-        // Reynold's rules with all previous info (updates the speed[][] table)
-        reynolds_rules();
         
-        msl = speed[robot_id][0];
-        msr = speed[robot_id][1];
-        
-        // Compute wheels speed from reynold's speed
-        compute_wheel_speeds(&msl, &msr);
-
-
-        // Adapt speed instinct to distance sensor values
-       /* if (sum_sensors > NB_SENSORS * MIN_SENS){
-            msl -= msl * max_sens / (2 * MAX_SENS);
-            msr -= msr * max_sens / (2 * MAX_SENS);
+        // Finite state machine
+        i_sensor_max = -1;
+        float max_value_sensor = 0.0;
+    
+        for (i = 0; i < NB_SENSORS; i++){
+            // read sensor values
+            // reads the handle in ds[i] and saves its value in ds_value[i]
+            ds_value[i] = wb_distance_sensor_get_value(ds[i]); // range: 0 (far) to 4095 (0 distance (in theory))
+            printf("id %d ds %f\n", robot_id, ds_value[i]);
+    
+            if(ds_value[i] > OBSTACLE && ds_value[i] > max_value_sensor){
+                state = BRAITENBERG;
+                max_value_sensor = ds_value[i];
+                i_sensor_max = i;
+            } else if(i_sensor_max == -1) {
+                state = REYNOLD;
+                
+                speed[robot_id][0] /= 1000;
+                speed[robot_id][1] /= 1000;
+            }
         }
 
-        // Add Braitenberg
-        msl += bmsl;
-        msr += bmsr;*/
+        switch(state){
+            case BRAITENBERG:
+                // Braitenberg's vehicle to avoid obstacles
+                braitenberg(i_sensor_max);
+                
+                msl = speed[robot_id][0];
+                msr = speed[robot_id][1];
+            
+                break;
+                
+            case REYNOLD:
+            
+            default:
+                // Reynold's rules with all previous info (updates the speed[][] table)
+                reynolds_rules();
+                
+                msl = speed[robot_id][0];
+                msr = speed[robot_id][1];
+        
+                compute_wheel_speeds(&msl, &msr);
+                break;
+        }
+        printf("id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, speed[robot_id][0], speed[robot_id][1]);
 
         /*Webots 2018b*/
         // Set speed
         msl_w = msl * MAX_SPEED_WEB / 1000;
         msr_w = msr * MAX_SPEED_WEB / 1000;
+        printf("id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, msl_w, msr_w);
+        
         wb_motor_set_velocity(left_motor, msl_w);
         wb_motor_set_velocity(right_motor, msr_w);
         
