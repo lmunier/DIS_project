@@ -18,6 +18,7 @@
 #define AXE_LENGTH 		0.052		// Distance between wheels of robot (meters)
 #define SPEED_UNIT_RADS 	0.00628 	// Conversion factor from speed unit to radian per second
 #define WHEEL_RADIUS 		0.0205		// Wheel radius (meters)
+#define PI			3.1415
 
 #define NB_SENSORS		8		// Number of IR sensors
 #define MIN_SENS          	350     	// Minimum sensibility value
@@ -31,10 +32,10 @@
 #define RULE2_WEIGHT       	(0.02/10)	// Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT        	(1.0/10)   	// Weight of consistency rule. default 1.0/10
 #define MIGRATION_WEIGHT    	(0.01/10)   	// Wheight of attraction towards the common goal. default 0.01/10
-#define MIGRATORY_URGE 		1		// Tells the robots if they should just go forward or move towards a specific migratory direction
+#define MIGRATORY_URGE 		0		// Tells the robots if they should just go forward or move towards a specific migratory direction
 
-WbDeviceTag left_motor; 			//handler for left wheel of the robot
-WbDeviceTag right_motor; 			//handler for the right wheel of the robot
+WbDeviceTag left_motor; 			// Handler for left wheel of the robot
+WbDeviceTag right_motor; 			// Handler for the right wheel of the robot
 
 //RIGHT,LEFT
 int e_puck_matrix[16] = {10,30,35,40,10,-40,-60,-70,-70,-60,-40,10,40,35,30,10}; // for obstacle avoidance
@@ -67,7 +68,7 @@ static void reset(){
 	receiver2 = wb_robot_get_device("receiver2");
 	emitter2 = wb_robot_get_device("emitter2");
 	
-	//get motors
+	// Get motors
 	left_motor = wb_robot_get_device("left wheel motor");
         right_motor = wb_robot_get_device("right wheel motor");
 	wb_motor_set_position(left_motor, INFINITY);
@@ -76,8 +77,8 @@ static void reset(){
         int i;
 	char s[4]="ps0";
 	for(i=0;i<NB_SENSORS;i++) {
-		ds[i]=wb_robot_get_device(s);				// the device name is specified in the world file
-		s[2]++;							// increases the device number
+		ds[i]=wb_robot_get_device(s);				// The device name is specified in the world file
+		s[2]++;							// Increases the device number
 	}
 
 	robot_name=(char*) wb_robot_get_name(); 
@@ -89,19 +90,19 @@ static void reset(){
 
 	wb_receiver_enable(receiver2,64);
 
-	//Reading the robot's name. Pay attention to name specification when adding robots to the simulation!
-	sscanf(robot_name,"epuck%d",&myself.ID); 			// read robot id from the robot's name
-	myself.ID = myself.ID%FLOCK_SIZE;	  			// normalize between 0 and FLOCK_SIZE-1
+	// Reading the robot's name. Pay attention to name specification when adding robots to the simulation!
+	sscanf(robot_name,"epuck%d",&myself.ID); 			// Read robot id from the robot's name
+	myself.ID = myself.ID%FLOCK_SIZE;	  			// Normalize between 0 and FLOCK_SIZE-1
 
 	for(i=0;i<FLOCK_SIZE;i++) 
 	{
-		myself.distances[i][0] = 0;            	//Initialize distance tab X
-               	myself.distances[i][1] = 0;            	//Initialize distance tab Z
-               	myself.previousDistances[i][0] = 0;   	//Initialize distance tab X
-              	myself.previousDistances[i][1] = 0;   	//Initialize distance tab Z
-               	myself.relAngle[i] = 0;                	//Initialize relative angle tab
-               	myself.speed[i][0] = 0;                	//Initialize speed tab X
-              	myself.speed[i][1] = 0;                	//Initialize speed tab Z
+		myself.distances[i][0] = 0;            	// Initialize distance tab X
+               	myself.distances[i][1] = 0;            	// Initialize distance tab Z
+               	myself.previousDistances[i][0] = 0;   	// Initialize distance tab X
+              	myself.previousDistances[i][1] = 0;   	// Initialize distance tab Z
+               	myself.relAngle[i] = 0;                	// Initialize relative angle tab
+               	myself.speed[i][0] = 0;                	// Initialize speed tab X
+              	myself.speed[i][1] = 0;                	// Initialize speed tab Z
            	myself.init = 0;
 	}
 
@@ -155,8 +156,8 @@ void update_self_motion(int msl, int msr)
 
 void compute_wheel_speeds(int *msl, int *msr)
 {
-    	float x = myself.speed[myself.ID][0] * cosf(myself.my_position[2]) + myself.speed[myself.ID][1] * sinf(myself.my_position[2]);    // Speed X in robot coordinates
-    	float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);   // Speed Z in robot coordinates
+    	float x = myself.speed[myself.ID][0] * cosf(myself.my_position[2]) + myself.speed[myself.ID][1] * sinf(myself.my_position[2]);    // Speed X in robot coordinates from global coordinates
+    	float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);   // Speed Z in robot coordinates from global coordinates
 	
     	float Ku = 0.2;                        // Forward control coefficient
     	float Kw = 1;                          // Rotational control coefficient
@@ -172,9 +173,9 @@ void compute_wheel_speeds(int *msl, int *msr)
     	float w = Kw * bearing;
 	// ADD PID CONTROL?
 
-    	// Convert to wheel speeds!
-    	*msl = (u - AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
-    	*msr = (u + AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
+    	// Convert to wheel speeds (number of steps for each wheels)!
+    	*msl = (u - AXE_LENGTH * w / 2.0) * (1000.0 / (2*PI*WHEEL_RADIUS));		// *msl = (u - AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
+    	*msr = (u + AXE_LENGTH * w / 2.0) * (1000.0 / (2*PI*WHEEL_RADIUS));		// *msl = (u + AXE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
 	
     	limit(msl, MAX_SPEED);
    	limit(msr, MAX_SPEED);
@@ -182,12 +183,12 @@ void compute_wheel_speeds(int *msl, int *msr)
 
 void reynolds_rules()
 {
-	int i, j, k;                     // Loop counters
-    	float rel_avg_loc[2] = {0, 0};   // Flock average positions
-    	float rel_avg_speed[2] = {0, 0}; // Flock average speeds
-    	float cohesion[2] = {0, 0};
-    	float dispersion[2] = {0, 0};
-    	float consistency[2] = {0, 0};
+	int i, j, k;                     	// Loop counters
+    	float rel_avg_loc[2] = {0, 0};   	// Flock average positions
+    	float rel_avg_speed[2] = {0, 0}; 	// Flock average speeds
+    	float cohesion[2] = {0, 0};		// Cohesion factor
+    	float dispersion[2] = {0, 0};		// Dispersion factor
+    	float consistency[2] = {0, 0};		// Consistency factor
 
     	/* Compute averages over the whole flock */
     	for (i=0;i<FLOCK_SIZE;i++){
@@ -198,7 +199,10 @@ void reynolds_rules()
         	for (j = 0; j < 2; j++){
            		rel_avg_speed[j] += myself.speed[i][j];
             		rel_avg_loc[j] += myself.distances[i][j];
-        	}
+            		if(myself.ID == 0){
+                  		printf("dist %d: %lf, speed: %lf\n",i,myself.distances[i][j],myself.speed[i][j]);
+                           }
+         }
     	}
 	
     	for (j=0;j<2;j++){
@@ -234,16 +238,16 @@ void reynolds_rules()
         	myself.speed[myself.ID][j] +=  dispersion[j] 	* RULE2_WEIGHT;
         	myself.speed[myself.ID][j] +=  consistency[j] 	* RULE3_WEIGHT;
     	}
-    	myself.speed[myself.ID][1] *= -1; 								//y axis of webots is inverted
+    	myself.speed[myself.ID][1] *= -1; 		//y axis of webots is inverted
 
     	//move the robot according to some migration rule
-    	if (MIGRATORY_URGE == 0){
+    	/*if (MIGRATORY_URGE == 0){
         	myself.speed[myself.ID][0] += 0.01 * cos(myself.my_position[2] + M_PI / 2);
         	myself.speed[myself.ID][1] += 0.01 * sin(myself.my_position[2] + M_PI / 2);
     	} else {
         	myself.speed[myself.ID][0] += (myself.migr[0] - myself.my_position[0]) * MIGRATION_WEIGHT;
         	myself.speed[myself.ID][1] -= (myself.migr[1] - myself.my_position[1]) * MIGRATION_WEIGHT; 		//y axis of webots is inverted
-    	}	
+    	}*/	
 }
 
 void send_ping(void)  
@@ -263,7 +267,7 @@ void process_received_ping_messages(void)
         char *inbuffer;										// Buffer for the receiver node
         int emmiter_id;										// ID of the emmiter robot
 
-        printf("Queue length: %d\n",wb_receiver_get_queue_length(receiver2));
+        //printf("Queue length: %d\n",wb_receiver_get_queue_length(receiver2));
         
         while (wb_receiver_get_queue_length(receiver2) > 0) {
 
@@ -306,7 +310,7 @@ int main(){
 	wb_robot_step(TIME_STEP+((myself.ID*DELTA_T)/FLOCK_SIZE));		// Shift in time the robots depending on their ID
 	
 	for(;;){
-		
+
 		send_ping();							// Send ping message
 
 		// Compute self position
@@ -320,22 +324,19 @@ int main(){
 		myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
 		myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
 
-		// Reynold's rules with all previous info (updates the speed[][] table)
+		// Reynold's rules with all previous info (updates the myself.speed[][] table)
         	reynolds_rules();
 
 		msl = myself.speed[myself.ID][0];
         	msr = myself.speed[myself.ID][1];
-		printf("Robot: %d --- MSL: %lf, MSR: %lf\n",myself.ID, msl,msr);
 
 		// Compute wheels speed from reynold's speed
         	compute_wheel_speeds(&msl, &msr);
-		printf("Robot: %d --- MSL: %lf, MSR: %lf\n",myself.ID, msl,msr);
 
-		msl = msl * MAX_SPEED_WEB / 1000;
-		msr = msr * MAX_SPEED_WEB / 1000;
-		printf("Robot: %d --- MSL: %lf, MSR: %lf\n",myself.ID, msl,msr);
-		wb_motor_set_velocity(left_motor, msl);
-		wb_motor_set_velocity(right_motor, msr);
+		msl = msl * MAX_SPEED_WEB / MAX_SPEED;		// Conversion to webot speed, not needed for real situation!
+		msr = msr * MAX_SPEED_WEB / MAX_SPEED;		// Conversion to webot speed, not needed for real situation!
+		wb_motor_set_velocity(left_motor, msl);		// Apply speed command
+		wb_motor_set_velocity(right_motor, msr);	// Apply speed command
 
 		wb_robot_step(TIME_STEP);					// Wait a time step
 	}
