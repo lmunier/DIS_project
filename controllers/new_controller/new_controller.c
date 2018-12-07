@@ -12,8 +12,8 @@
 #define ABS(x) ((x>=0)?(x):-(x))
 
 #define FLOCK_SIZE		5		// Number of robots
-#define TIME_STEP 		2*0.64		// Step duration time
-#define DELTA_T			2*0.064	        // Timestep (seconds)
+#define TIME_STEP 		64.0		// Step duration time
+#define DELTA_T			0.064	         // Timestep (seconds)
 
 #define AXE_LENGTH 		0.052		// Distance between wheels of robot (meters)
 #define SPEED_UNIT_RADS 	0.00628 	// Conversion factor from speed unit to radian per second
@@ -54,9 +54,9 @@ struct robot{
 	double my_position[3];				// Initial position of myself: X, Z and theta
 	double my_previous_position[3];			// Initial position of myself: X, Z and theta
 	double migr[2];					// Position for the migratory urge
-  //double absSpeed[FLOCK_SIZE][2];        A faire?
+	int send;
+	double absSpeed[FLOCK_SIZE][2];			       		
 }myself;
-
 
 static void reset(){
 	
@@ -103,6 +103,8 @@ static void reset(){
                	myself.relAngle[i] = 0;                	// Initialize relative angle tab
                	myself.speed[i][0] = 0;                	// Initialize speed tab X
               	myself.speed[i][1] = 0;                	// Initialize speed tab Z
+		myself.absSpeed[i][0] = 0;
+		myself.absSpeed[i][1] = 0;
            	myself.init = 0;
 	}
 
@@ -112,6 +114,10 @@ static void reset(){
 	myself.my_previous_position[0] = 0;			// Set previous X position of myself to 0
 	myself.my_previous_position[1] = 0;			// Set previous Z position of myself to 0
 	myself.my_previous_position[2] = 0;			// Set previous theta position of myself to 0
+	if(myself.ID == 0)	
+		myself.send = 1;
+	else
+		myself.send = 0;
   
         //printf("Reset: robot %d\n",myself.ID);
         
@@ -152,6 +158,9 @@ void update_self_motion(int msl, int msr)
        		myself.my_position[2] -= 2.0 * M_PI;
     	if (myself.my_position[2] < 0)
         	myself.my_position[2] += 2.0 * M_PI;
+
+	myself.absSpeed[myself.ID][0] = (1.0/DELTA_T)*(myself.my_position[0]-myself.my_previous_position[0]);
+	myself.absSpeed[myself.ID][1] = (1.0/DELTA_T)*(myself.my_position[1]-myself.my_previous_position[1]);
 }
 
 void compute_wheel_speeds(int *msl, int *msr)
@@ -199,9 +208,6 @@ void reynolds_rules()
         	for (j = 0; j < 2; j++){
            		rel_avg_speed[j] += myself.speed[i][j];
             		rel_avg_loc[j] += myself.distances[i][j];
-            		if(myself.ID == 0){
-                  		printf("dist %d: %lf, speed: %lf\n",i,myself.distances[i][j],myself.speed[i][j]);
-                           }
          }
     	}
 	
@@ -241,18 +247,19 @@ void reynolds_rules()
     	myself.speed[myself.ID][1] *= -1; 		//y axis of webots is inverted
 
     	//move the robot according to some migration rule
-    	/*if (MIGRATORY_URGE == 0){
+    	if (MIGRATORY_URGE == 0){
         	myself.speed[myself.ID][0] += 0.01 * cos(myself.my_position[2] + M_PI / 2);
         	myself.speed[myself.ID][1] += 0.01 * sin(myself.my_position[2] + M_PI / 2);
     	} else {
         	myself.speed[myself.ID][0] += (myself.migr[0] - myself.my_position[0]) * MIGRATION_WEIGHT;
         	myself.speed[myself.ID][1] -= (myself.migr[1] - myself.my_position[1]) * MIGRATION_WEIGHT; 		//y axis of webots is inverted
-    	}*/	
+    	}	
 }
 
 void send_ping(void)  
 {
         char out[10];
+	myself.send = 0;
         sprintf(out,"%d",myself.ID);				// In the ping message we send the name of the robot.
         wb_emitter_send(emitter2,out,strlen(out)+1); 		// Send Message
 }
@@ -262,10 +269,11 @@ void process_received_ping_messages(void)
         const double *message_direction;							// Direction of the message
         double message_rssi; 									// Received Signal Strength indicator
         double abs_theta;									// Absolute angle of the other robots
-        double rel_theta;									// Relative angle of the other robots
+        //double rel_theta;									// Relative angle of the other robots
         double range;										// Range of the message
         char *inbuffer;										// Buffer for the receiver node
         int emmiter_id;										// ID of the emmiter robot
+	int nextID;
 
         //printf("Queue length: %d\n",wb_receiver_get_queue_length(receiver2));
         
@@ -280,23 +288,45 @@ void process_received_ping_messages(void)
 		
 		// Identification of the sender
 		emmiter_id = (inbuffer[0]-'0');                                    		// Get emmiter ID
-		//printf("Rec : %d, emm: %d \n", myself.ID, emmiter_id);
+		
+		nextID = (emmiter_id+1)%FLOCK_SIZE;	
+
+		if(nextID == myself.ID){
+			myself.send = 1;
+		}
                 
                 myself.relAngle[emmiter_id] = -atan2(z,x);					// Find the relative theta
                 abs_theta = myself.relAngle[emmiter_id] + myself.my_position[2]; 		// Find the absolute theta;
 		range = sqrt((1/message_rssi));							// Find the range of the message
-		
-                // Processing of the message
-		// Computation of the distances
+
 		myself.previousDistances[emmiter_id][0] = myself.distances[emmiter_id][0];     		// Store previous X relative distances
 		myself.previousDistances[emmiter_id][1] = myself.distances[emmiter_id][1];     		// Store previous Z relative distances
-		myself.distances[emmiter_id][0] = range*cos(abs_theta);             	            	// Compute relative X pos
-		myself.distances[emmiter_id][1] = -1.0 * range*sin(abs_theta);      	            	// Compute relative Z pos
+		myself.distances[emmiter_id][0] = range*cos(abs_theta);             	            		// Compute relative X pos
+		myself.distances[emmiter_id][1] = -1.0 * range*sin(abs_theta);           	            		// Compute relative Z pos
 
                 // Computation of the speeds
-		myself.speed[emmiter_id][0] = 1.0*(1/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]);  // Compute relative X speed
-		myself.speed[emmiter_id][1] = 1.0*(1/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]);  // Compute relative Z speed	
-		
+		myself.speed[emmiter_id][0] = 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]);  // Compute relative X speed
+		myself.speed[emmiter_id][1] = 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]);  // Compute relative Z speed	
+
+		// Computation of the absolute speeds
+		myself.absSpeed[emmiter_id][0] = myself.absSpeed[myself.ID][0]+myself.speed[emmiter_id][0];
+		myself.absSpeed[emmiter_id][1] = myself.absSpeed[myself.ID][1]+myself.speed[emmiter_id][1];
+
+		/*if(myself.ID == 0){
+			printf("Rec : %d, emm: %d \n", myself.ID, emmiter_id);
+			printf("Directions: %lf, %lf\n", message_direction[0],message_direction[1]);
+			printf("Message rssi: %lf\n", message_rssi);
+			printf("Rel angle: %lf\n", myself.relAngle[emmiter_id]);
+			printf("Abs angle: %lf\n", abs_theta);
+			printf("Range: %lf\n", range);
+			printf("Dist X: %lf\n", range*cos(abs_theta));
+			printf("Dist Z: %lf\n", -1.0 * range*sin(abs_theta));
+			printf("Prev dist X: %lf\n", myself.previousDistances[emmiter_id][0]);
+			printf("Prev dist Z: %lf\n", myself.previousDistances[emmiter_id][1]);
+			printf("Speed X: %lf\n", myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]);
+			printf("Speed Z: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]));
+		}*/		
+
 		wb_receiver_next_packet(receiver2);
 	}
 }
@@ -307,11 +337,13 @@ int main(){
 
 	reset();								// Reset the robot
 	
-	wb_robot_step(TIME_STEP+((myself.ID*DELTA_T)/FLOCK_SIZE));		// Shift in time the robots depending on their ID
-	
-	for(;;){
+	//wb_robot_step(TIME_STEP+((myself.ID*TIME_STEP)/FLOCK_SIZE));		// Shift in time the robots depending on their ID
+	wb_robot_step(TIME_STEP);
 
-		send_ping();							// Send ping message
+	for(;;){
+		
+		if(myself.send == 1)
+			send_ping();							// Send ping message
 
 		// Compute self position
         	myself.my_previous_position[0] = myself.my_position[0];
