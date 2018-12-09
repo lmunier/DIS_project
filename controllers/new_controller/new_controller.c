@@ -172,7 +172,8 @@ void compute_wheel_speeds(int *msl, int *msr)
     	float Kw = 1;                          // Rotational control coefficient
     	// float range = sqrtf(x * x + z * z);    // Distance to the wanted position
 	float range = sqrtf(x * x + z * z);    // Norm of the wanted speed vector in robot coordinate
-    	float bearing = -atan2(x, z);          // Orientation of the wanted speed vector
+    	//float bearing = -atan2(x, z);          // Orientation of the wanted speed vector
+	float bearing = -atan2(x, z);          // Orientation of the wanted speed vector
 
     	// Compute forward control
     	float u = Ku * range * cosf(bearing);
@@ -244,7 +245,7 @@ void reynolds_rules()
         	myself.speed[myself.ID][j] +=  dispersion[j] 	* RULE2_WEIGHT;
         	myself.speed[myself.ID][j] +=  consistency[j] 	* RULE3_WEIGHT;
     	}
-    	myself.speed[myself.ID][1] *= -1; 		//y axis of webots is inverted
+    	//myself.speed[myself.ID][1] *= -1; 		//y axis of webots is inverted
 
     	//move the robot according to some migration rule
     	if (MIGRATORY_URGE == 0){
@@ -283,17 +284,18 @@ void initial_pos(void)
 		double z = message_direction[2];                                             	// Z direction
 		double x = message_direction[1];                                             	// X direction
 
-		myself.my_position[2] = -atan2(z,x);					// Find the relative theta
+		myself.my_position[2] = -atan2(x,z);					// Find the relative theta
                 //abs_theta = myself.relAngle[emmiter_id] + myself.my_position[2]; 		// Find the absolute theta;
 		range = sqrt((1/message_rssi));
 
 		
 		myself.my_position[0] = range*cos(myself.my_position[2]);             	            		// Compute relative X pos
-		myself.my_position[1] = -1.0 * range*sin(myself.my_position[2]);           	            		// Compute relative Z pos
+		myself.my_position[1] = -1.0*range*sin(myself.my_position[2]);           	            		// Compute relative Z pos
 		myself.my_previous_position[0] = myself.my_position[0];     		// Store previous X relative distances
 		myself.my_previous_position[1] = myself.my_position[1];     		// Store previous Z relative distances
 
 		myself.init = 1;		
+		printf("X: %lf, Z: %lf, Theta: %lf\n",myself.my_position[0],myself.my_position[1],myself.my_position[2]);
 
         	wb_receiver_next_packet(receiver2);
     	}
@@ -328,24 +330,32 @@ void process_received_ping_messages(void)
 		message_rssi = wb_receiver_get_signal_strength(receiver2);                  	// Get strength
 		double z = message_direction[2];                                             	// Z direction
 		double x = message_direction[1];                                             	// X direction
+		//ROUGE = X, BLEU = Z, VERT = Y
 		
 		// Identification of the sender
 		emmiter_id = (inbuffer[0]-'0');                                    		// Get emmiter ID
-		
+		//printf("EMM: %d, REC: %d, Z: %lf, X: %lf\n",emmiter_id, myself.ID,z,x);
+		//printf("EMM: %d, REC: %d, A: %lf, B: %lf, C: %lf\n",emmiter_id, myself.ID,message_direction[0],message_direction[1],message_direction[2]);
 		nextID = (emmiter_id+1)%FLOCK_SIZE;	
 
 		if(nextID == myself.ID){
 			myself.send = 1;
 		}
                 
-                myself.relAngle[emmiter_id] = -atan2(z,x);					// Find the relative theta
+                myself.relAngle[emmiter_id] = -atan2(x,z);					// Find the relative theta
+		//myself.relAngle[emmiter_id] = atan2(x,z);					// Find the relative theta
                 abs_theta = myself.relAngle[emmiter_id] + myself.my_position[2]; 		// Find the absolute theta;
 		range = sqrt((1/message_rssi));							// Find the range of the message
 
 		myself.previousDistances[emmiter_id][0] = myself.distances[emmiter_id][0];     		// Store previous X relative distances
 		myself.previousDistances[emmiter_id][1] = myself.distances[emmiter_id][1];     		// Store previous Z relative distances
-		myself.distances[emmiter_id][0] = range*cos(abs_theta);             	            		// Compute relative X pos
-		myself.distances[emmiter_id][1] = -1.0 * range*sin(abs_theta);           	            		// Compute relative Z pos
+		myself.distances[emmiter_id][0] = range*cos(myself.relAngle[emmiter_id]);             	            		// Compute relative X pos
+		myself.distances[emmiter_id][1] = -1.0 * range*sin(myself.relAngle[emmiter_id]);           	            		// Compute relative Z pos
+		//myself.distances[emmiter_id][1] = range*cos(myself.relAngle[emmiter_id]);             	            		// Compute relative X pos
+		//myself.distances[emmiter_id][0] = range*sin(myself.relAngle[emmiter_id]);           	            		// Compute relative Z pos
+
+		//if(myself.ID == 0 && emmiter_id == 2)
+			//printf("EMM: %d, REC: %d, X: %lf, Z: %lf, Theta: %lf\n",emmiter_id, myself.ID,myself.distances[emmiter_id][0],myself.distances[emmiter_id][1],myself.relAngle[emmiter_id]);
 
                 // Computation of the speeds
 		myself.speed[emmiter_id][0] = 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]);  // Compute relative X speed
@@ -356,18 +366,18 @@ void process_received_ping_messages(void)
 		myself.absSpeed[emmiter_id][1] = myself.absSpeed[myself.ID][1]+myself.speed[emmiter_id][1];
 
 		//if(myself.ID == 0){
-			printf("Rec : %d, emm: %d \n", myself.ID, emmiter_id);
+			//printf("Rec : %d, emm: %d \n", myself.ID, emmiter_id);
 			//printf("Directions: %lf, %lf\n", message_direction[0],message_direction[1]);
 			//printf("Message rssi: %lf\n", message_rssi);
 			//printf("Rel angle: %lf\n", myself.relAngle[emmiter_id]);
 			//printf("Abs angle: %lf\n", abs_theta);
 			//printf("Range: %lf\n", range);
-			printf("Dist X: %lf\n", myself.my_position[0]);
-			printf("Dist Z: %lf\n", myself.my_position[1]);
+			//printf("Dist X: %lf\n", myself.my_position[0]);
+			//printf("Dist Z: %lf\n", myself.my_position[1]);
 			//printf("Prev dist X: %lf\n", myself.previousDistances[emmiter_id][0]);
 			//printf("Prev dist Z: %lf\n", myself.previousDistances[emmiter_id][1]);
-			printf("Speed X: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]));
-			printf("Speed Z: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]));
+			//printf("Speed X: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][0]-myself.previousDistances[emmiter_id][0]));
+			//printf("Speed Z: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emmiter_id][1]-myself.previousDistances[emmiter_id][1]));
 		//}		
 
 		wb_receiver_next_packet(receiver2);
@@ -380,57 +390,46 @@ int main(){
 
 	reset();								// Reset the robot
 	
-	//wb_robot_step(TIME_STEP+((myself.ID*TIME_STEP)/FLOCK_SIZE));		// Shift in time the robots depending on their ID
 	wb_robot_step(TIME_STEP);
 
-	//if(myself.init == 0){
-		if(myself.send == 1){
-			myself.init = 1;
-			send_ping();
-			myself.send = 1;
-			//continue;
-		}else
-			initial_pos();
+	//if(myself.send == 1){
+		//myself.init = 1;
+		//send_ping();
+		//myself.send = 1;
+	//}else
+		//initial_pos();
 		
-	//}
-
-	wb_motor_set_velocity(left_motor, 3);		// Apply speed command
-		wb_motor_set_velocity(right_motor, 3);
-
-	while(1)
-		wb_robot_step(TIME_STEP);
-
 	for(;;){
 		
-		if(myself.send == 1)
-			send_ping();							// Send ping message
+		//if(myself.send == 1)
+			//send_ping();							// Send ping message
 
 		// Compute self position
-        	myself.my_previous_position[0] = myself.my_position[0];
-        	myself.my_previous_position[1] = myself.my_position[1];
+        	//myself.my_previous_position[0] = myself.my_position[0];
+        	//myself.my_previous_position[1] = myself.my_position[1];
         
-        	update_self_motion(msl, msr);
+        	update_self_motion(1, -1);
 
-		process_received_ping_messages();				// Process the received messages
+		//process_received_ping_messages();				// Process the received messages
 
-		myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
-		myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
+		//myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);		// Store myself X speed
+		//myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);		// Store myself Y speed
 
 		// Reynold's rules with all previous info (updates the myself.speed[][] table)
-        	reynolds_rules();
+        	//reynolds_rules();
 
-		msl = myself.speed[myself.ID][0];
-        	msr = myself.speed[myself.ID][1];
+		//msl = myself.speed[myself.ID][0];
+        	//msr = myself.speed[myself.ID][1];
 
 		// Compute wheels speed from reynold's speed
-        	compute_wheel_speeds(&msl, &msr);
+        	//compute_wheel_speeds(&msl, &msr);
 
-		msl = msl * MAX_SPEED_WEB / MAX_SPEED;		// Conversion to webot speed, not needed for real situation!
-		msr = msr * MAX_SPEED_WEB / MAX_SPEED;		// Conversion to webot speed, not needed for real situation!
-		wb_motor_set_velocity(left_motor, msl);		// Apply speed command
-		wb_motor_set_velocity(right_motor, msr);	// Apply speed command
+		//msl = msl * MAX_SPEED_WEB / 1000;		// Conversion to webot speed, not needed for real situation!
+		//msr = msr * MAX_SPEED_WEB / 1000;		// Conversion to webot speed, not needed for real situation!
+		wb_motor_set_velocity(left_motor, 1);		// Apply speed command
+		wb_motor_set_velocity(right_motor, -1);	// Apply speed command
 
-		//printf("ID : %d, %lf, %lf %lf\n",myself.ID, myself.my_position[0],myself.my_position[1],myself.my_position[2]);
+		printf("ID : %d, %lf, %lf %lf, ms: %d, %d\n",myself.ID, myself.my_position[0],myself.my_position[1],myself.my_position[2],msl,msr);
 
 		wb_robot_step(TIME_STEP);					// Wait a time step
 	}
