@@ -140,12 +140,12 @@ void compute_fitness(float *p_t, float *p_mean) {
 int main(int argc, char *args[]) {
     char buffer[255];	// Buffer for sending data
     
-    /*if (argc == 4) { // Get parameters
+    if (argc == 4) { // Get parameters
         offset = atoi(args[1]);
         migrx = atof(args[2]);
         migrz = atof(args[3]);
         
-        //migration goal point comes from the controller arguments. It is defined in the world-file, under "controllerArgs" of the supervisor.
+        // migration goal point comes from the controller arguments. It is defined in the world-file, under "controllerArgs" of the supervisor.
         printf("Offset : %d\t", offset);
         printf("Migratory instinct : (%f, %f)\n", migrx, migrz);
     } else {
@@ -157,7 +157,7 @@ int main(int argc, char *args[]) {
     
     if (orient_migr<0) {
         orient_migr+=2*M_PI; // Keep value within 0, 2pi
-    }*/
+    }
     
     reset();
     send_init_poses();
@@ -177,7 +177,8 @@ int main(int argc, char *args[]) {
                 				
                 // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
                 sprintf(buffer,"%1d#%f#%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2]);
-                wb_emitter_send(emitter,buffer,strlen(buffer));				
+                wb_emitter_send(emitter,buffer,strlen(buffer));
+                printf("ID %1d \t Position x : %f, z %f, theta:%f\n",i+offset,loc[i][0],loc[i][1],loc[i][2]);				
             }
             
             //Compute and normalize fitness values

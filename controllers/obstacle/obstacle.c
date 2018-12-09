@@ -21,8 +21,9 @@
 #include <webots/emitter.h>
 #include <webots/receiver.h>
 
-#define OBSTACLE                            70
-#define FORWARD_SPEED                       500
+#define OBSTACLE_START                            100
+#define OBSTACLE_END                              80
+#define FORWARD_SPEED                       150
 #define NB_SENSORS 			8  		// Number of distance sensors
 #define MIN_SENS 			350  		// Minimum sensibility value
 #define MAX_SENS 			4096 		// Maximum sensibility value
@@ -38,13 +39,13 @@
 #define WHEEL_RADIUS 			0.0205		// Wheel radius (meters)
 #define DELTA_T 			0.064		// Timestep (seconds)
 
-#define RULE1_THRESHOLD 		0.25		// Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT 			(0.4 / 10) 	// Weight of aggregation rule. default 0.6/10
+#define RULE1_THRESHOLD 		0.17		// Threshold to activate aggregation rule. default 0.20
+#define RULE1_WEIGHT 			(0.7 / 10) 	// Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD 		0.15	 	// Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT 			(0.08 / 10)           // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT 			(0.02 / 10)           // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT 			(0.6 / 10) 	// Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT 			(0.9 / 10) 	// Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT 		(0.01 / 10)           // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -162,6 +163,7 @@ void update_self_motion(int msl, int msr)
     // Keep orientation within 0, 2pi
     if (my_position[2] > 2 * M_PI)
         my_position[2] -= 2.0 * M_PI;
+        
     if (my_position[2] < 0)
         my_position[2] += 2.0 * M_PI;
 }
@@ -189,8 +191,8 @@ void compute_wheel_speeds(float *msl, float *msr)
     float w = Kw * bearing;
 
     // Convert to wheel speeds!
-    *msl = (u - AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));    // Add 2*M_PI
-    *msr = (u + AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));    // Add 2*M_PI
+    *msl = (u - AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));
+    *msr = (u + AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));
 	
     //	printf("bearing = %f, u = %f, w = %f, msl = %f, msr = %f\n", bearing, u, w, msl, msr);
     limit(msl, MAX_SPEED);
@@ -203,7 +205,7 @@ void compute_wheel_speeds(float *msl, float *msr)
 
 void reynolds_rules()
 {
-    int i, j, k;                     // Loop counters
+    int i, k;                     // Loop counters
     float rel_avg_loc[2] = {0, 0};   // Flock average positions
     float rel_avg_speed[2] = {0, 0}; // Flock average speeds
     float cohesion[2] = {0, 0};
@@ -212,41 +214,43 @@ void reynolds_rules()
 
     /* Compute averages over the whole flock */
     for (i = 0; i < FLOCK_SIZE; i++){
-        if (i == robot_id)
-            continue;
-        for (j = 0; j < 2; j++){
-            rel_avg_speed[j] += relative_speed[i][j];
-            rel_avg_loc[j] += relative_pos[i][j];
+        if (i != robot_id){
+            rel_avg_speed[0] += relative_speed[i][0];
+            rel_avg_loc[0] += relative_pos[i][0];
+            
+            rel_avg_speed[1] += relative_speed[i][1];
+            rel_avg_loc[1] += relative_pos[i][1];
         }
     }
-	
-    for (j = 0; j < 2; j++){
-        rel_avg_speed[j] /= (FLOCK_SIZE - 1);
-        rel_avg_loc[j] /= (FLOCK_SIZE - 1);
-    }
+    
+    // Divide by the number of robot take into account
+    rel_avg_speed[0] /= (FLOCK_SIZE - 1);
+    rel_avg_loc[0] /= (FLOCK_SIZE - 1);
+    
+    rel_avg_speed[1] /= (FLOCK_SIZE - 1);
+    rel_avg_loc[1] /= (FLOCK_SIZE - 1);
 	
     /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
-    for (j = 0; j < 2; j++){
-        if(rel_avg_loc[j] > RULE1_THRESHOLD)
-            cohesion[j] = rel_avg_loc[j];
-    }
+    if(rel_avg_loc[0] > RULE1_THRESHOLD)
+        cohesion[0] = rel_avg_loc[0];
+        
+    if(rel_avg_loc[1] > RULE1_THRESHOLD)
+        cohesion[1] = rel_avg_loc[1];
 
     /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
     for (k = 0; k < FLOCK_SIZE; k++){
         if (k != robot_id){ // Loop on flockmates only
             // If neighbor k is too close (Euclidean distance)
             if (sqrtf(relative_pos[k][0]*relative_pos[k][0] + relative_pos[k][1]*relative_pos[k][1]) < RULE2_THRESHOLD){
-                for (j = 0; j < 2; j++){
-                    dispersion[j] -= (1 / relative_pos[k][j]);
-                }
+                dispersion[0] -= (1 / relative_pos[k][0]);
+                dispersion[1] -= (1 / relative_pos[k][1]);
             }
         }
     }
 
     /* Rule 3 - Consistency/Alignment: match the speeds of flockmates */
-    for (j = 0; j < 2; j++){
-        consistency[j] = rel_avg_speed[j];
-    }
+    consistency[0] = rel_avg_speed[0];
+    consistency[1] = rel_avg_speed[1];
 
     //aggregation of all behaviors with relative influence determined by weights
     speed[robot_id][0] = cohesion[0] * RULE1_WEIGHT + dispersion[0] * RULE2_WEIGHT + consistency[0] * RULE3_WEIGHT;
@@ -268,26 +272,26 @@ void reynolds_rules()
 
 void braitenberg(int i_sensor_max, float *msl, float *msr)
 {
-    static double ds_coeff[NB_SENSORS] = {1.8, 1.4, 1.0, 0.5,
-                                          0.5, 1.0, 1.4, 1.8}; //coefficient values for each sensor
+    static double ds_coeff[NB_SENSORS] = {0.7, 0.5, 0.2, 0.002,
+                                          0.002, 0.2, 0.5, 0.7}; //coefficient values for each sensor
                                           
     printf("i_sensor_max %d\n", i_sensor_max);
   
     // Controller with Braitenberg implementation
     if (i_sensor_max >= 0 && i_sensor_max < 3) { // we detected an obstacle with right sensors
         for(int i = 0; i < NB_SENSORS/2; i++){
-            *msl -= ds_coeff[i]*ds_value[i];
             *msr += ds_coeff[i]*ds_value[i];
+            *msl -= ds_coeff[i]*ds_value[i];
         }
         
     } else if (i_sensor_max > 4 && i_sensor_max <= 7) { // we detected an obstacle with left sensors
         for(int i = 0; i < NB_SENSORS/2; i++){
-            *msl += ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
             *msr -= ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
+            *msl += ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
         }
     } else {
-        *msl = FORWARD_SPEED;
-        *msr = FORWARD_SPEED;
+        *msr = FORWARD_SPEED/(ds_coeff[3]*ds_value[3]+ds_coeff[4]*ds_value[4]);
+        *msl = FORWARD_SPEED/(ds_coeff[3]*ds_value[3]+ds_coeff[4]*ds_value[4]);
     }
     
     limit(msr, MAX_SPEED);
@@ -459,18 +463,18 @@ int main()
             // read sensor values
             // reads the handle in ds[i] and saves its value in ds_value[i]
             ds_value[i] = wb_distance_sensor_get_value(ds[i]); // range: 0 (far) to 4095 (0 distance (in theory))
-            //printf("id %d ds %f\n", robot_id, ds_value[i]);
+            printf("id %d state %d ds %f\n", robot_id, state, ds_value[i]);
     
-            if(ds_value[i] > OBSTACLE && ds_value[i] > max_value_sensor){
-                state = BRAITENBERG;
+            if(ds_value[i] > max_value_sensor){
                 max_value_sensor = ds_value[i];
                 i_sensor_max = i;
-            } else if(i_sensor_max == -1) {
-                state = REYNOLD;
-                
-                //speed[robot_id][0] /= 1000;
-                //speed[robot_id][1] /= 1000;
             }
+        }
+
+        if(max_value_sensor > OBSTACLE_START){
+            state = BRAITENBERG;
+        } else if (max_value_sensor < OBSTACLE_END){
+            state = REYNOLD;
         }
 
         switch(state){
@@ -492,16 +496,6 @@ int main()
                 break;
         }
         
-        /*reynolds_rules();
-                
-        printf("1 id %d State %d speed_0 %lf speed_1 %lf\n", robot_id, state, speed[robot_id][0], speed[robot_id][1]);
-        msl = speed[robot_id][0];
-        msr = speed[robot_id][1];
-        printf("2 id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, msl, msr);
-        
-        compute_wheel_speeds(&msl, &msr);
-        braitenberg(i_sensor_max, &msl, &msr);*/
-        
         // Compute wheels speed from reynold's speed
         printf("3 id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, msl, msr);
 
@@ -512,8 +506,6 @@ int main()
         
         wb_motor_set_velocity(left_motor, msl_w);
         wb_motor_set_velocity(right_motor, msr_w);
-        
-        //wb_differential_wheels_set_speed(msl,msr);
         /*Webots 2018b*/
 
         // Continue one step
