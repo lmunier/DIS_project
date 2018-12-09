@@ -65,6 +65,8 @@ void send_init_poses(void) {
         // Send it out
         sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
         wb_emitter_send(emitter,buffer,strlen(buffer));
+        
+        printf("ID: %d, X: %lf, Z: %lf, Theta: %lf\n",i,loc[i][0],loc[i][1],loc[i][2]);
       
         // Run one step
         wb_robot_step(TIME_STEP);
