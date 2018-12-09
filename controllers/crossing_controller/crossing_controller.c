@@ -21,8 +21,6 @@
 #include <webots/emitter.h>
 #include <webots/receiver.h>
 
-#define OBSTACLE                            70
-#define FORWARD_SPEED                       500
 #define NB_SENSORS 			8  		// Number of distance sensors
 #define MIN_SENS 			350  		// Minimum sensibility value
 #define MAX_SENS 			4096 		// Maximum sensibility value
@@ -30,7 +28,7 @@
 /*Webots 2018b*/
 #define MAX_SPEED_WEB 			6.28 		// Maximum speed webots
 /*Webots 2018b*/
-#define FLOCK_SIZE 			5 		// Size of flock
+#define FLOCK_SIZE 			5		// Size of flock
 #define TIME_STEP 			64 		// [ms] Length of time step
 
 #define AXLE_LENGTH 			0.052		// Distance between wheels of robot (meters)
@@ -38,13 +36,13 @@
 #define WHEEL_RADIUS 			0.0205		// Wheel radius (meters)
 #define DELTA_T 			0.064		// Timestep (seconds)
 
-#define RULE1_THRESHOLD 		0.25		// Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT 			(0.4 / 10) 	// Weight of aggregation rule. default 0.6/10
+#define RULE1_THRESHOLD 		0.20		// Threshold to activate aggregation rule. default 0.20
+#define RULE1_WEIGHT 			(0.6 / 10) 	// Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD 		0.15	 	// Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT 			(0.08 / 10)           // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT 			(0.02 / 10)           // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT 			(0.6 / 10) 	// Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT 			(1.0 / 10) 	// Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT 		(0.01 / 10)           // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -56,6 +54,8 @@
 WbDeviceTag left_motor;  		//handler for left wheel of the robot
 WbDeviceTag right_motor; 		//handler for the right wheel of the robot
 /*Webots 2018b*/
+
+int e_puck_matrix[16] = {17, 29, 34, 10, 8, -38, -56, -76, -72, -58, -36, 8, 10, 36, 28, 18}; // for obstacle avoidance
 
 WbDeviceTag ds[NB_SENSORS]; 		// Handle for the infrared distance sensors
 WbDeviceTag receiver2;			// Handle for the receiver node
@@ -70,16 +70,11 @@ float prev_my_position[3];		// X, Z, Theta of the current robot in the previous 
 float speed[FLOCK_SIZE][2];		// Speeds calculated with Reynold's rules
 float relative_speed[FLOCK_SIZE][2];	// Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-float migr[2] = {0, -50};	           // Migration vector
+float migr[2] = {500, -25};	           // Migration vector
 char* robot_name;
 
 float theta_robots[FLOCK_SIZE];
 int initialized[FLOCK_SIZE];		// != 0 if initial positions have been received
-
-float ds_value[NB_SENSORS]; //distance values for each sensor
-
-// Enume for our state machine
-typedef enum {REYNOLD, BRAITENBERG} STATE;
 
 /*
  * Reset the robot's devices and get its ID
@@ -114,7 +109,7 @@ static void reset()
 
     wb_receiver_enable(receiver2, 64);
 
-    //Reading the robot'ds[i]s name. Pay attention to name specification when adding robots to the simulation!
+    //Reading the robot's name. Pay attention to name specification when adding robots to the simulation!
     sscanf(robot_name, "epuck%d", &robot_id_u);      // read robot id from the robot's name
     robot_id = robot_id_u % FLOCK_SIZE;	         // normalize between 0 and FLOCK_SIZE-1
 
@@ -128,12 +123,12 @@ static void reset()
 /*
  * Keep given int number within interval {-limit, limit}
  */
-void limit(float *number, int limit)
+void limit(int *number, int limit)
 {
-    if ((int)(*number) > limit)
-        *number = (float)limit;
-    if ((int)(*number) < -limit)
-        *number = (float)(-limit);
+    if (*number > limit)
+        *number = limit;
+    if (*number < -limit)
+        *number = -limit;
 }
 
 /*
@@ -169,10 +164,12 @@ void update_self_motion(int msl, int msr)
 /*
  * Computes wheel speed given a certain X,Z speed
  */
-void compute_wheel_speeds(float *msl, float *msr)
+void compute_wheel_speeds(int *msl, int *msr)
 {
     // Compute wanted position from Reynold's speed and current location
-    // Change of coordinates system 
+    //float x = speed[robot_id][0]*cosf(loc[robot_id][2]) - speed[robot_id][1]*sinf(loc[robot_id][2]);  // x in robot coordinates
+    //float z = -speed[robot_id][0]*sinf(loc[robot_id][2]) - speed[robot_id][1]*cosf(loc[robot_id][2]); // z in robot coordinates
+
     float x = speed[robot_id][0] * cosf(my_position[2]) + speed[robot_id][1] * sinf(my_position[2]);    // x in robot coordinates
     float z = -speed[robot_id][0] * sinf(my_position[2]) + speed[robot_id][1] * cosf(my_position[2]);   // z in robot coordinates
     //	printf("id = %d, x = %f, y = %f\n", robot_id, x, z);
@@ -185,12 +182,12 @@ void compute_wheel_speeds(float *msl, float *msr)
     // Compute forward control
     float u = Ku * range * cosf(bearing);
     
-    // Compute rotational control
+	// Compute rotational control
     float w = Kw * bearing;
 
     // Convert to wheel speeds!
-    *msl = (u - AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));    // Add 2*M_PI
-    *msr = (u + AXLE_LENGTH * w / 2.0) * (1000.0 / (WHEEL_RADIUS));    // Add 2*M_PI
+    *msl = (u - AXLE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
+    *msr = (u + AXLE_LENGTH * w / 2.0) * (1000.0 / WHEEL_RADIUS);
 	
     //	printf("bearing = %f, u = %f, w = %f, msl = %f, msr = %f\n", bearing, u, w, msl, msr);
     limit(msl, MAX_SPEED);
@@ -221,23 +218,22 @@ void reynolds_rules()
     }
 	
     for (j = 0; j < 2; j++){
-        rel_avg_speed[j] /= (FLOCK_SIZE - 1);
-        rel_avg_loc[j] /= (FLOCK_SIZE - 1);
+        rel_avg_speed[j] /= FLOCK_SIZE - 1;
+        rel_avg_loc[j] /= FLOCK_SIZE - 1;
     }
 	
     /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
     for (j = 0; j < 2; j++){
-        if(rel_avg_loc[j] > RULE1_THRESHOLD)
-            cohesion[j] = rel_avg_loc[j];
+        cohesion[j] = rel_avg_loc[j];
     }
 
     /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
     for (k = 0; k < FLOCK_SIZE; k++){
         if (k != robot_id){ // Loop on flockmates only
             // If neighbor k is too close (Euclidean distance)
-            if (sqrtf(relative_pos[k][0]*relative_pos[k][0] + relative_pos[k][1]*relative_pos[k][1]) < RULE2_THRESHOLD){
+            if ((relative_pos[k][0]*relative_pos[k][0] + relative_pos[k][1]*relative_pos[k][1]) < RULE2_THRESHOLD){
                 for (j = 0; j < 2; j++){
-                    dispersion[j] -= (1 / relative_pos[k][j]);
+                    dispersion[j] -= 1 / relative_pos[k][j];
                 }
             }
         }
@@ -249,8 +245,12 @@ void reynolds_rules()
     }
 
     //aggregation of all behaviors with relative influence determined by weights
-    speed[robot_id][0] = cohesion[0] * RULE1_WEIGHT + dispersion[0] * RULE2_WEIGHT + consistency[0] * RULE3_WEIGHT;
-    speed[robot_id][1] = -(cohesion[1] * RULE1_WEIGHT + dispersion[1] * RULE2_WEIGHT + consistency[1] * RULE3_WEIGHT); // Z axis inverted
+    for (j = 0; j < 2; j++){
+        speed[robot_id][j] = cohesion[j] * RULE1_WEIGHT;
+        speed[robot_id][j] += dispersion[j] * RULE2_WEIGHT;
+        speed[robot_id][j] += consistency[j] * RULE3_WEIGHT;
+    }
+    speed[robot_id][1] *= -1; //y axis of webots is inverted
 
     //move the robot according to some migration rule
     if (MIGRATORY_URGE == 0){
@@ -258,40 +258,8 @@ void reynolds_rules()
         speed[robot_id][1] += 0.01 * sin(my_position[2] + M_PI / 2);
     } else {
         speed[robot_id][0] += (migr[0] - my_position[0]) * MIGRATION_WEIGHT;
-        speed[robot_id][1] -= (migr[1] - my_position[1]) * MIGRATION_WEIGHT; //z axis of webots is inverted
+        speed[robot_id][1] -= (migr[1] - my_position[1]) * MIGRATION_WEIGHT; //y axis of webots is inverted
     }
-}
-
-/*
- *  Update speed according to Braitenberg's vehicle
- */
-
-void braitenberg(int i_sensor_max, float *msl, float *msr)
-{
-    static double ds_coeff[NB_SENSORS] = {1.8, 1.4, 1.0, 0.5,
-                                          0.5, 1.0, 1.4, 1.8}; //coefficient values for each sensor
-                                          
-    printf("i_sensor_max %d\n", i_sensor_max);
-  
-    // Controller with Braitenberg implementation
-    if (i_sensor_max >= 0 && i_sensor_max < 3) { // we detected an obstacle with right sensors
-        for(int i = 0; i < NB_SENSORS/2; i++){
-            *msl -= ds_coeff[i]*ds_value[i];
-            *msr += ds_coeff[i]*ds_value[i];
-        }
-        
-    } else if (i_sensor_max > 4 && i_sensor_max <= 7) { // we detected an obstacle with left sensors
-        for(int i = 0; i < NB_SENSORS/2; i++){
-            *msl += ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
-            *msr -= ds_coeff[i+NB_SENSORS/2]*ds_value[i+NB_SENSORS/2];
-        }
-    } else {
-        *msl = FORWARD_SPEED;
-        *msr = FORWARD_SPEED;
-    }
-    
-    limit(msr, MAX_SPEED);
-    limit(msl, MAX_SPEED);
 }
 
 /*
@@ -390,27 +358,48 @@ void initial_pos(void)
 // the main function
 int main()
 {
-    float msl, msr; // Wheel speeds
-    
+    int msl, msr; // Wheel speeds
     /*Webots 2018b*/
     float msl_w, msr_w;
     /*Webots 2018b*/
-    
-    int i, i_sensor_max = -1;
+    int bmsl, bmsr, sum_sensors;   // Braitenberg parameters
+    int distances[NB_SENSORS];     // Array for the distance sensor readings
+    int max_sens;
     char *inbuffer;
     int rob_nb;
     float rob_x, rob_z, rob_theta; // Store highest sensor value
-    
-    STATE state = REYNOLD;
 
     reset();	             // Resetting the robot
     initial_pos();                 // initializing the robot's position
     
     msl = 0;
     msr = 0;
+    max_sens = 0;
 	
     // Forever
     for (;;){
+        bmsl = 0;
+        bmsr = 0;
+        sum_sensors = 0;
+        max_sens = 0;
+
+        /* Braitenberg */
+        /*for (int i = 0; i < NB_SENSORS; i++){
+            distances[i] = wb_distance_sensor_get_value(ds[i]);             // Read sensor values
+            sum_sensors += distances[i];                                    // Add up sensor values
+            max_sens = (max_sens > distances[i]) ? max_sens : distances[i]; // Check if new highest sensor value
+
+            // Weighted sum of distance sensor values for Braitenburg vehicle
+            bmsr += e_puck_matrix[i] * distances[i];
+            bmsl += e_puck_matrix[i + NB_SENSORS] * distances[i];
+        }
+
+        // Adapt Braitenberg values (empirical tests)
+        bmsl /= MIN_SENS;
+        bmsr /= MIN_SENS;
+        bmsl += 66;
+        bmsr += 72;*/
+
         /* Send and get information */
         //send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
@@ -448,68 +437,33 @@ int main()
 
         //process_received_ping_messages();
 
-        //speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
-        //speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
-        
-        // Finite state machine
-        i_sensor_max = -1;
-        float max_value_sensor = 0.0;
-    
-        for (i = 0; i < NB_SENSORS; i++){
-            // read sensor values
-            // reads the handle in ds[i] and saves its value in ds_value[i]
-            ds_value[i] = wb_distance_sensor_get_value(ds[i]); // range: 0 (far) to 4095 (0 distance (in theory))
-            //printf("id %d ds %f\n", robot_id, ds_value[i]);
-    
-            if(ds_value[i] > OBSTACLE && ds_value[i] > max_value_sensor){
-                state = BRAITENBERG;
-                max_value_sensor = ds_value[i];
-                i_sensor_max = i;
-            } else if(i_sensor_max == -1) {
-                state = REYNOLD;
-                
-                //speed[robot_id][0] /= 1000;
-                //speed[robot_id][1] /= 1000;
-            }
-        }
+        // speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
+        // speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
 
-        switch(state){
-            case BRAITENBERG:
-                // Braitenberg's vehicle to avoid obstacles
-                braitenberg(i_sensor_max, &msl, &msr);            
-                break;
-                
-            case REYNOLD:
-            
-            default:
-                // Reynold's rules with all previous info (updates the speed[][] table)
-                reynolds_rules();
-                
-                msl = speed[robot_id][0];
-                msr = speed[robot_id][1];
+        // Reynold's rules with all previous info (updates the speed[][] table)
+        reynolds_rules();
         
-                compute_wheel_speeds(&msl, &msr);
-                break;
-        }
-        
-        /*reynolds_rules();
-                
-        printf("1 id %d State %d speed_0 %lf speed_1 %lf\n", robot_id, state, speed[robot_id][0], speed[robot_id][1]);
         msl = speed[robot_id][0];
         msr = speed[robot_id][1];
-        printf("2 id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, msl, msr);
-        
-        compute_wheel_speeds(&msl, &msr);
-        braitenberg(i_sensor_max, &msl, &msr);*/
         
         // Compute wheels speed from reynold's speed
-        printf("3 id %d State %d speed_0 %f speed_1 %f\n", robot_id, state, msl, msr);
+        compute_wheel_speeds(&msl, &msr);
+
+
+        // Adapt speed instinct to distance sensor values
+       /* if (sum_sensors > NB_SENSORS * MIN_SENS){
+            msl -= msl * max_sens / (2 * MAX_SENS);
+            msr -= msr * max_sens / (2 * MAX_SENS);
+        }
+
+        // Add Braitenberg
+        msl += bmsl;
+        msr += bmsr;*/
 
         /*Webots 2018b*/
         // Set speed
         msl_w = msl * MAX_SPEED_WEB / 1000;
         msr_w = msr * MAX_SPEED_WEB / 1000;
-        
         wb_motor_set_velocity(left_motor, msl_w);
         wb_motor_set_velocity(right_motor, msr_w);
         
