@@ -9,37 +9,33 @@
 #include <webots/emitter.h>
 #include <webots/supervisor.h>
 
+//#define METRICS
 #define FLOCK_SIZE	5		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
-//#define METRICS
-
 #define MAX_SPEED         6.28     	// Maximum speed [m/s]
-
-#define RULE1_THRESHOLD 0.2
 
 WbNodeRef robs[FLOCK_SIZE];		// Robots nodes
 WbFieldRef robs_trans[FLOCK_SIZE];	// Robots translation fields
 WbFieldRef robs_rotation[FLOCK_SIZE];	// Robots rotation fields
-WbDeviceTag emitter;			// Single emitter
 
-float loc[FLOCK_SIZE][3];		// Location of everybody in the flock
+float first_loc[FLOCK_SIZE][3] = {0};		// First location of everybody in the flock
+float position[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
+float loc[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
+float relative_loc[FLOCK_SIZE][3] = {0};          // Relative location of everybody in the flock
 
-int offset;				// Offset of robots number
-float migrx, migrz;			// Migration vector
+int offset;			// Offset of robots number
+float migr[2] = {0, 0};	           // Migration vector
 float orient_migr; 			// Migration orientation
 int t;
+bool init = false;
 
 /*
  * Initialize flock position and devices
  */
 void reset(void) {
     wb_robot_init();
-    
-    emitter = wb_robot_get_device("emitter");
-    if (emitter == 0) printf("missing emitter\n");
-    	
     char rob[7] = "epuck0";
     
     for (int i=0; i<FLOCK_SIZE; i++) {
@@ -51,23 +47,49 @@ void reset(void) {
 }
 
 /*
- * Send initialize position
+ * Send initialize relative position
  */
-void send_init_poses(void) {
-    char buffer[255];	// Buffer for sending data
-           
+void compute_positions(void) {
+    if(!init){
+        relative_loc[0][0] = 0;
+        relative_loc[0][1] = 0;
+        relative_loc[0][2] = 0;
+    }
+                
     for (int i=0; i<FLOCK_SIZE; i++) {
         // Get data
         loc[i][0] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[0]; // X
         loc[i][1] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[2]; // Z
         loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
-      
-        // Send it out
-        sprintf(buffer,"%1d#%f#%f#%f##%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2], migrx, migrz);
-        wb_emitter_send(emitter,buffer,strlen(buffer));
-      
-        // Run one step
-        wb_robot_step(TIME_STEP);
+        
+        if(!init){
+            first_loc[i][0] = loc[i][0];
+            first_loc[i][1] = loc[i][1];
+            first_loc[i][2] = loc[i][2];
+            
+            init = true;
+        }
+    
+        if(i > 0){
+            relative_loc[i][0] = loc[i][0] - loc[0][0];
+            relative_loc[i][1] = loc[i][1] - loc[0][1];
+            relative_loc[i][2] = loc[i][2] - loc[0][2];
+        }
+        
+        position[i][0] = loc[i][0] - first_loc[i][0];
+        position[i][1] = loc[i][1] - first_loc[i][1];
+        position[i][2] = loc[i][2] - first_loc[i][2];
+        
+        // Keep orientation within 0, 2pi
+        if (position[i][2] > 2 * M_PI)
+            position[i][2] -= 2.0 * M_PI;
+            
+        if (position[i][2] < 0)
+            position[i][2] += 2.0 * M_PI;
+    
+        
+        printf("ID: %d, time %d position_X: %f, position_Z: %f\n",i,t,position[i][1],-position[i][0]);
+        printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta: %f\n",i,t,relative_loc[i][1],-relative_loc[i][0],relative_loc[i][2]-M_PI/2);
     }
 }
 
@@ -136,57 +158,26 @@ void compute_fitness(float *p_t, float *p_mean) {
  * Main function.
  */
 int main(int argc, char *args[]) {
-    char buffer[255];	// Buffer for sending data
-    
-    /*if (argc == 4) { // Get parameters
-        offset = atoi(args[1]);
-        migrx = atof(args[2]);
-        migrz = atof(args[3]);
-        
-        //migration goal point comes from the controller arguments. It is defined in the world-file, under "controllerArgs" of the supervisor.
-        printf("Offset : %d\t", offset);
-        printf("Migratory instinct : (%f, %f)\n", migrx, migrz);
-    } else {
-        printf("Missing argument\n");
-        return 1;
-    }
-    
-    orient_migr = -atan2f(migrx,migrz);
-    
-    if (orient_migr<0) {
-        orient_migr+=2*M_PI; // Keep value within 0, 2pi
-    }*/
+    // Initialize reference fitness values
+    static float p_t = 0.0, p_mean = 0.0;
+    orient_migr = -atan2f(migr[1],migr[0]);
     
     reset();
-    send_init_poses();
-	
-    // Compute reference fitness values
-    static float p_t = 0.0, p_mean = 0.0;
     		
     for(;;) {
-        wb_robot_step(TIME_STEP);
-    		
-        if (t % 10 == 0) {
-            for (int i=0; i<FLOCK_SIZE; i++) {
-                // Get data
-                loc[i][0] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[0]; // X
-                loc[i][1] = wb_supervisor_field_get_sf_vec3f(robs_trans[i])[2]; // Z
-                loc[i][2] = wb_supervisor_field_get_sf_rotation(robs_rotation[i])[3]; // THETA
-                				
-                // Sending positions to the robots, comment the following two lines if you don't want the supervisor sending it                   		
-                sprintf(buffer,"%1d#%f#%f#%f",i+offset,loc[i][0],loc[i][1],loc[i][2]);
-                wb_emitter_send(emitter,buffer,strlen(buffer));				
-            }
-            
-            //Compute and normalize fitness values
-            compute_fitness(&p_t, &p_mean);
-            
-            #ifdef METRICS	
-                printf("p_t = %f \t p_mean = %f\n", p_t, p_mean);
-            #endif
-        }
+        // Compute and print the relative and globale positions
+        compute_positions();
+        
+        // Compute and normalize fitness values
+        compute_fitness(&p_t, &p_mean);
+        
+        #ifdef METRICS	
+            printf("p_t = %f \t p_mean = %f\n", p_t, p_mean);
+        #endif
     		
         t += TIME_STEP;
+        wb_robot_step(TIME_STEP);
     }
 
 }
+
