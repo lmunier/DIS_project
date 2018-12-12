@@ -247,8 +247,7 @@ void reynolds_rules() {
 	if(nb_neighbours != 0){
 		for(j=0;j<2;j++){
 			rel_avg_loc[j] /= (nb_neighbours+1);
-			//rel_avg_speed[j] += relative_speed[robot_id][j];   // A VERIFIER
-			rel_avg_speed[j] /= (nb_neighbours+1);		// +1 A VERIFIER
+			rel_avg_speed[j] /= (nb_neighbours);
 		}
 	}
 
