@@ -235,7 +235,7 @@ void reynolds_rules() {
   for (j = 0; j < 2; j++) {
     if (nb_neighbours != 0) {
       rel_avg_loc[j] /= (nb_neighbours + 1);
-      rel_avg_speed[j] /= (nb_neighbours + 1);
+      rel_avg_speed[j] /= (nb_neighbours);
     }
   }
   
@@ -252,7 +252,7 @@ void reynolds_rules() {
     if (robot_id != i) {
       if(sqrt(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2)) < RULE2_THRESHOLD) {
         for (j=0;j<2;j++) {
-            dispersion[j] -= relative_pos[i][j];
+            dispersion[j] -= 1/relative_pos[i][j];
         }
       }
     }
