@@ -62,7 +62,8 @@ WbDeviceTag right_motor;  // handler for the right wheel of the robot
 /*Webots 2018b*/
 
 // for obstacle avoidance
-int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
+//int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
+int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};
 
 WbDeviceTag ds[NB_SENSORS];  // Handle for the infrared distance sensors
 WbDeviceTag receiver2;       // Handle for the receiver node
@@ -235,8 +236,6 @@ void reynolds_rules() {
     if (nb_neighbours != 0) {
       rel_avg_loc[j] /= (nb_neighbours + 1);
       rel_avg_speed[j] /= (nb_neighbours + 1);
-    } else {
-      rel_avg_speed[j] = relative_speed[robot_id][j];
     }
   }
   
