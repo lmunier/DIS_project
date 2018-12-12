@@ -87,9 +87,9 @@ void compute_positions(void) {
         if (position[i][2] < 0)
             position[i][2] += 2.0 * M_PI;
     
-        
-        printf("ID: %d, time %d position_X: %f, position_Z: %f\n",i,t,position[i][1],-position[i][0]);
-        printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta: %f\n",i,t,relative_loc[i][1],-relative_loc[i][0],relative_loc[i][2]-M_PI/2);
+        // Print positions
+        //printf("ID: %d, time %d position_X: %f, position_Z: %f\n",i,t,position[i][1],-position[i][0]);
+        //printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta: %f\n",i,t,relative_loc[i][1],-relative_loc[i][0],relative_loc[i][2]-M_PI/2);
     }
 }
 
@@ -180,4 +180,3 @@ int main(int argc, char *args[]) {
     }
 
 }
-

@@ -19,7 +19,7 @@
 #include <webots/receiver.h>
 
 #define NB_SENSORS 8   // Number of distance sensors
-#define MIN_SENS 350   // Minimum sensibility value
+#define MIN_SENS 300   // Minimum sensibility value
 #define MAX_SENS 4096  // Maximum sensibility value
 #define MAX_SPEED 800  // Maximum speed
 /*Webots 2018b*/
@@ -85,6 +85,7 @@ char *robot_name;
 
 float theta_robots[FLOCK_SIZE];
 int init_pos = 0;
+int t;
 
 /*
  * Reset the robot's devices and get its ID
@@ -173,7 +174,7 @@ void update_self_motion(int msl, int msr) {
   if (my_position[2] > 2 * M_PI) my_position[2] -= 2.0 * M_PI;
   if (my_position[2] < 0) my_position[2] += 2.0 * M_PI;
 
-  printf("ID : %d , X : %f , Y: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
+  printf("ID: %d , X : %f , Z: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
 }
 
 /*
@@ -235,8 +236,6 @@ void reynolds_rules() {
     if (nb_neighbours != 0) {
       rel_avg_loc[j] /= (nb_neighbours + 1);
       rel_avg_speed[j] /= (nb_neighbours + 1);
-    } else {
-      rel_avg_speed[j] = relative_speed[robot_id][j];
     }
   }
   
@@ -302,7 +301,6 @@ void send_ping(void) {
 void process_received_ping_messages(void) {
   const double *message_direction;
   double message_rssi;  // Received Signal Strength indicator
-  double theta;
   double range;
   char *inbuffer;  // Buffer for the receiver node
   int other_robot_id;
@@ -431,6 +429,10 @@ int main() {
     // Add Braitenberg
     msl += bmsl;
     msr += bmsr;
+    
+    // Print positions
+    //printf("ID: %d, time %d position_X: %f, position_Z: %f\n",robot_id,t,my_position[0], my_position[1]);
+    //printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta: %f\n",(robot_id+1)%FLOCK_SIZE,t,relative_pos[(robot_id+1)%FLOCK_SIZE][0],relative_pos[(robot_id+1)%FLOCK_SIZE][1],relative_pos[(robot_id+1)%FLOCK_SIZE][2]);
 
     /*Webots 2018b*/
     // Set speed
@@ -444,6 +446,7 @@ int main() {
 
     // Continue one step
     wb_robot_step(TIME_STEP);
+    t += TIME_STEP;
   }
 }
 
