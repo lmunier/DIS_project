@@ -34,12 +34,12 @@
 #define DELTA_T 0.064        // Timestep (seconds)
 
 #define RULE1_THRESHOLD  0.25  // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT (0.3 / 10)  // Weight of aggregation rule. default 0.6/10
+#define RULE1_WEIGHT      0.02//(0.3 / 10)  // Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD  0.1  // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.5 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT 1.0/10    //(0.5 / 10)  // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT (0.02 / 10)  // Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT 0.01//(0.02 / 10)  // Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -81,7 +81,7 @@ float prev_my_position[3];   // X, Z, Theta of the current robot in the previous
                              // time step
 float speed[FLOCK_SIZE][2];  // Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];  // != 0 if initial positions have been received
-float migr[2] = {0, 5};    // Migration vector
+float migr[2] = {5, 5};    // Migration vector
 char *robot_name;
 
 float theta_robots[FLOCK_SIZE];
@@ -123,7 +123,7 @@ static void reset() {
   // robots to the simulation!
 
   // read robot id from the robot's name
-  sscanf(robot_name, "epuck%d", &robot_id_u);                 
+  sscanf(robot_name, "epuck%d", &robot_id_u);
   robot_id = robot_id_u % FLOCK_SIZE;  // normalize between 0 and FLOCK_SIZE-1
 
   for(i=0; i<3; i++) {
@@ -174,7 +174,7 @@ void update_self_motion(int msl, int msr) {
   if (my_position[2] > 2 * M_PI) my_position[2] -= 2.0 * M_PI;
   if (my_position[2] < 0) my_position[2] += 2.0 * M_PI;
 
-  printf("ID : %d , X : %f , Y: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
+  //printf("ID : %d , X : %f , Y: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
 }
 
 /*
@@ -190,7 +190,7 @@ void compute_wheel_speeds(int *msl, int *msr) {
   float range = sqrtf(x * x + z * z);  // Distance to the wanted position
   float bearing = -atan2(x, z);        // Orientation of the wanted position
 
-  float u = K_U * range * cosf(bearing);  // Compute7 forward control
+  float u = K_U * range * cosf(bearing);  // Compute forward control
   float w = K_W * bearing;                // Compute rotational control
 
   // Convert to wheel speeds!int
@@ -238,7 +238,7 @@ void reynolds_rules() {
       rel_avg_speed[j] /= (nb_neighbours + 1);
     }
   }
-  
+
 
   /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
   for (j = 0; j < 2; j++) {
@@ -391,13 +391,17 @@ int main() {
       // Weighted sum of distance sensor values for Braitenburg vehicle
       bmsr += e_puck_matrix[i] * distances[i];
       bmsl += e_puck_matrix[i + NB_SENSORS] * distances[i];
+
+      //printf("ID: %d, D%d: %d\n", robot_id, i, distances[i]);
     }
 
     // Adapt Braitenberg values (empirical tests)
+    printf("ID: %d: %d, %d\n",robot_id, bmsl, bmsr);
     bmsl /= MIN_SENS;
     bmsr /= MIN_SENS;
-    bmsl += 200;//66;
-    bmsr += 200;//72;
+    printf("ID: %d: %d, %d\n",robot_id, bmsl, bmsr);
+    //bmsl += 200;//66;
+    //bmsr += 200;//72;
 
     /* Send and get information */
     send_ping();  // sending a ping to other robot, so they can measure their
@@ -431,6 +435,9 @@ int main() {
     msl += bmsl;
     msr += bmsr;
 
+    limit(&msl, MAX_SPEED);
+    limit(&msr, MAX_SPEED);
+
     /*Webots 2018b*/
     // Set speed
     msl_w = msl * MAX_SPEED_WEB / 1000;
@@ -445,4 +452,3 @@ int main() {
     wb_robot_step(TIME_STEP);
   }
 }
-
