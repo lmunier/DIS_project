@@ -37,7 +37,7 @@
 #define RULE1_WEIGHT (0.3 / 10)  // Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD  0.1  // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.5 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT (0.0002 / 10)  // Weight of dispersion rule. default 0.02/10
 
 #define RULE3_WEIGHT (0.02 / 10)  // Weight of consistency rule. default 1.0/10
 
@@ -243,7 +243,7 @@ void reynolds_rules() {
   for (j = 0; j < 2; j++) {
     if (nb_neighbours != 0) {
       rel_avg_loc[j] /= (nb_neighbours + 1);
-      rel_avg_speed[j] /= (nb_neighbours + 1);
+      rel_avg_speed[j] /= (nb_neighbours);
     }
   }
   
@@ -251,7 +251,8 @@ void reynolds_rules() {
   /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
   for (j = 0; j < 2; j++) {
     //If center of mass is too far
-    if(fabs(rel_avg_loc[j]) > RULE1_THRESHOLD) {
+    //if(fabs(rel_avg_loc[j]) > RULE1_THRESHOLD) {
+    if(sqrt(pow(relative_pos[robot_id][0],2)+pow(relative_pos[robot_id][1],2))>RULE1_THRESHOLD){
         cohesion[j] = rel_avg_loc[j];
     }
   }
@@ -259,9 +260,9 @@ void reynolds_rules() {
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (robot_id != i) {
-      if(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2) < RULE2_THRESHOLD) {
+      if(sqrt(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2)) < RULE2_THRESHOLD) {
         for (j=0;j<2;j++) {
-            dispersion[j] -= relative_pos[i][j];
+            dispersion[j] -= 1/relative_pos[i][j];
         }
       }
     }
@@ -403,8 +404,8 @@ int main() {
     // Adapt Braitenberg values (empirical tests)
     bmsl /= MIN_SENS;
     bmsr /= MIN_SENS;
-    bmsl += 200;//66;
-    bmsr += 200;//72;
+    bmsl += 66;//200;//66;
+    bmsr += 66;//200;//72;
 
     /* Send and get information */
     send_ping();  // sending a ping to other robot, so they can measure their
