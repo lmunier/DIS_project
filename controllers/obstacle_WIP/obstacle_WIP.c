@@ -150,6 +150,14 @@ void limit(int *number, int limit) {
 }
 
 /*
+ * Keep given float number within interval {-limit, limit}
+ */
+void limitf(float number, float limit) {
+  if (number > limit) number = limit;
+  if (number < -limit) number = -limit;
+}
+
+/*
  * Updates robot position with wheel speeds
  */
 void update_self_motion(int msl, int msr) {
@@ -430,14 +438,17 @@ int main() {
     msl += bmsl;
     msr += bmsr;
     
+    limit(&msl, MAX_SPEED);
+    limit(&msr, MAX_SPEED);
+    
     // Print positions
     //printf("ID: %d, time %d position_X: %f, position_Z: %f\n",robot_id,t,my_position[0], my_position[1]);
     //printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta: %f\n",(robot_id+1)%FLOCK_SIZE,t,relative_pos[(robot_id+1)%FLOCK_SIZE][0],relative_pos[(robot_id+1)%FLOCK_SIZE][1],relative_pos[(robot_id+1)%FLOCK_SIZE][2]);
 
     /*Webots 2018b*/
     // Set speed
-    msl_w = msl * MAX_SPEED_WEB / 1000;
-    msr_w = msr * MAX_SPEED_WEB / 1000;
+    msl_w = (float)msl * MAX_SPEED_WEB / 1000;
+    msr_w = (float)msr * MAX_SPEED_WEB / 1000;
 
     wb_motor_set_velocity(left_motor, msl_w);
     wb_motor_set_velocity(right_motor, msr_w);
