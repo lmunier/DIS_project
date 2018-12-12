@@ -9,12 +9,13 @@
 #include <webots/emitter.h>
 #include <webots/supervisor.h>
 
-//#define METRICS
+#define METRICS
 #define FLOCK_SIZE	5		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
-#define MAX_SPEED         6.28     	// Maximum speed [m/s]
+#define MAX_SPEED         0.1287     	// Maximum speed [m/s]
+#define MAX_SPEED_WEB         6.28     	// Maximum speed [rad/s]
 
 WbNodeRef robs[FLOCK_SIZE];		// Robots nodes
 WbFieldRef robs_trans[FLOCK_SIZE];	// Robots translation fields
@@ -26,7 +27,7 @@ float loc[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
 float relative_loc[FLOCK_SIZE][3] = {0};          // Relative location of everybody in the flock
 
 int offset;			// Offset of robots number
-float migr[2] = {0, 0};	           // Migration vector
+float migr[2] = {0, 5};	           // Migration vector
 float orient_migr; 			// Migration orientation
 int t;
 bool init = false;
@@ -137,9 +138,9 @@ void compute_fitness(float *p_t, float *p_mean) {
     #endif
     
     // Velocity of the team towards the goal direction
-    max_a = cosf(orient_migr)*sqrtf((mean_x - old_mean_x)*(mean_x - old_mean_x) +
-                                    (mean_z - old_mean_z)*(mean_z - old_mean_z))/MAX_SPEED;
-                                    
+    max_a = 1000.0*((mean_x - old_mean_x)*migr[1] - (mean_z - old_mean_z)*migr[0]);
+    max_a /= sqrtf(migr[0]*migr[0] + migr[1]*migr[1])*MAX_SPEED*TIME_STEP;
+    
     fit_s = (max_a < 0) ? 0 : max_a;
     
     #ifdef METRICS
@@ -160,7 +161,6 @@ void compute_fitness(float *p_t, float *p_mean) {
 int main(int argc, char *args[]) {
     // Initialize reference fitness values
     static float p_t = 0.0, p_mean = 0.0;
-    orient_migr = -atan2f(migr[1],migr[0]);
     
     reset();
     		

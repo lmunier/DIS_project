@@ -33,13 +33,13 @@
 #define WHEEL_RADIUS 0.0205  // Wheel radius (meters)
 #define DELTA_T 0.064        // Timestep (seconds)
 
-#define RULE1_THRESHOLD  0.25  // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT (0.3 / 10)  // Weight of aggregation rule. default 0.6/10
+#define RULE1_THRESHOLD  0.05  // Threshold to activate aggregation rule. default 0.20
+#define RULE1_WEIGHT (0.7 / 10)  // Weight of aggregation rule. default 0.6/10
 
-#define RULE2_THRESHOLD  0.1  // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.5 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_THRESHOLD  0.15 // Threshold to activate dispersion rule. default 0.15
+#define RULE2_WEIGHT (0.6 / 10)  // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT (0.02 / 10)  // Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT (0.55 / 10)  // Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -47,7 +47,7 @@
 
 #define ABS(x) ((x >= 0) ? (x) : -(x))
 
-#define MARGINAL_THRESHOLD 40
+#define MARGINAL_THRESHOLD 0.22
 
 /*Adding correction factor*/
 #define K_X	1.0
@@ -62,7 +62,8 @@ WbDeviceTag right_motor;  // handler for the right wheel of the robot
 /*Webots 2018b*/
 
 // for obstacle avoidance
-int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
+int e_puck_matrix[16] = {17,  29,  34,  10, 8, -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
+//int e_puck_matrix[16] = {30,  40,  40,  15, 8, -38, -60, -85, -85, -60, -36, 8,  13, 36,  34,  30};
 
 WbDeviceTag ds[NB_SENSORS];  // Handle for the infrared distance sensors
 WbDeviceTag receiver2;       // Handle for the receiver node
@@ -150,14 +151,6 @@ void limit(int *number, int limit) {
 }
 
 /*
- * Keep given float number within interval {-limit, limit}
- */
-void limitf(float number, float limit) {
-  if (number > limit) number = limit;
-  if (number < -limit) number = -limit;
-}
-
-/*
  * Updates robot position with wheel speeds
  */
 void update_self_motion(int msl, int msr) {
@@ -182,7 +175,7 @@ void update_self_motion(int msl, int msr) {
   if (my_position[2] > 2 * M_PI) my_position[2] -= 2.0 * M_PI;
   if (my_position[2] < 0) my_position[2] += 2.0 * M_PI;
 
-  printf("ID: %d , X : %f , Z: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
+  //printf("ID: %d , X : %f , Z: %f, TH : %f\n",robot_id,my_position[0],my_position[1],my_position[2]);
 }
 
 /*
@@ -227,8 +220,7 @@ void reynolds_rules() {
   /* Compute averages over the whole flock */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (i != robot_id) {
-      dist = sqrtf(relative_pos[i][0] * relative_pos[i][0] +
-                  relative_pos[i][1] * relative_pos[i][1]);
+      dist = sqrtf(relative_pos[i][0]*relative_pos[i][0] + relative_pos[i][1]*relative_pos[i][1]);
       if (dist < MARGINAL_THRESHOLD) {
         for (j = 0; j < 2; j++) {
           rel_avg_speed[j] += relative_speed[i][j];
@@ -247,10 +239,9 @@ void reynolds_rules() {
     }
   }
   
-
   /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
-  for (j = 0; j < 2; j++) {
-    //If center of mass is too far
+  //If center of mass is too far
+  for(j=0; j < 2; j++){
     if(fabs(rel_avg_loc[j]) > RULE1_THRESHOLD) {
         cohesion[j] = rel_avg_loc[j];
     }
@@ -259,7 +250,7 @@ void reynolds_rules() {
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (robot_id != i) {
-      if(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2) < RULE2_THRESHOLD) {
+      if(sqrt(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2)) < RULE2_THRESHOLD) {
         for (j=0;j<2;j++) {
             dispersion[j] -= relative_pos[i][j];
         }
@@ -403,8 +394,8 @@ int main() {
     // Adapt Braitenberg values (empirical tests)
     bmsl /= MIN_SENS;
     bmsr /= MIN_SENS;
-    bmsl += 200;//66;
-    bmsr += 200;//72;
+    bmsl += 150;//66;
+    bmsr += 150;//72;
 
     /* Send and get information */
     send_ping();  // sending a ping to other robot, so they can measure their
