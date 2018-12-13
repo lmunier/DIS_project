@@ -8,7 +8,7 @@
 #  TODO: Figure out why LD won't link C++ object files with standard args.
 # ==============================================================================
 
-PROG = real_controller
+PROG = test
 EPUCKLIBROOT = ../../src
 
 # ==============================================================================

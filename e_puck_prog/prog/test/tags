@@ -4,9 +4,54 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+ABS	main.c	49;"	d	file:
+AXLE_LENGTH	main.c	32;"	d	file:
+DELTA_T	main.c	35;"	d	file:
+FLOCK_SIZE	main.c	29;"	d	file:
+K_TH	main.c	56;"	d	file:
+K_U	main.c	57;"	d	file:
+K_W	main.c	58;"	d	file:
+K_X	main.c	54;"	d	file:
+K_Y	main.c	55;"	d	file:
+MARGINAL_THRESHOLD	main.c	51;"	d	file:
+MAX_SENS	main.c	27;"	d	file:
+MAX_SPEED	main.c	28;"	d	file:
+MIGRATION_WEIGHT	main.c	45;"	d	file:
+MIGRATORY_URGE	main.c	47;"	d	file:
+MIN_SENS	main.c	26;"	d	file:
+M_PI	main.c	24;"	d	file:
+NB_SENSORS	main.c	25;"	d	file:
+RULE1_THRESHOLD	main.c	37;"	d	file:
+RULE1_WEIGHT	main.c	38;"	d	file:
+RULE2_THRESHOLD	main.c	40;"	d	file:
+RULE2_WEIGHT	main.c	41;"	d	file:
+RULE3_WEIGHT	main.c	43;"	d	file:
+SPEED_UNIT_RADS	main.c	33;"	d	file:
+TIME_STEP	main.c	30;"	d	file:
+TRUE	main.c	31;"	d	file:
+WHEEL_RADIUS	main.c	34;"	d	file:
+compute_wheel_speeds	main.c	/^void compute_wheel_speeds(int *msl, int *msr)$/;"	f
+e_puck_matrix	main.c	/^int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};$/;"	v
 getselector	main.c	/^int getselector()$/;"	f
+init_pos	main.c	/^int init_pos = 0;$/;"	v
+initialized	main.c	/^float initialized[FLOCK_SIZE];  \/\/ != 0 if initial positions have been received$/;"	v
+limit	main.c	/^void limit(int *number, int limit)$/;"	f
 main	main.c	/^int main()$/;"	f
-obstacleAvoidance	main.c	/^void obstacleAvoidance()$/;"	f
-obstacleAvoidanceSpeed	main.c	/^int obstacleAvoidanceSpeed = 500.0;$/;"	v
-obstacleAvoidanceThreshold	main.c	/^int obstacleAvoidanceThreshold = 30.0;$/;"	v
-sensorDir	main.c	/^float sensorDir[NB_IR_SENSORS] = {0.2967, 0.8727, 1.5708, 2.6180, 3.6652, 4.7124, 5.4105, 5.9865};$/;"	v
+migr	main.c	/^float migr[2] = {0, 5};    \/\/ Migration vector$/;"	v
+my_position	main.c	/^float my_position[3];                 \/\/ X, Z, Theta of the current robot$/;"	v
+prev_my_position	main.c	/^float prev_my_position[3];   \/\/ X, Z, Theta of the current robot in the previous$/;"	v
+prev_relative_pos	main.c	/^float prev_relative_pos[FLOCK_SIZE][3]; \/\/ Previous relative  X, Z, Theta values$/;"	v
+process_received_ping_messages	main.c	/^void process_received_ping_messages(void)$/;"	f
+relative_pos	main.c	/^float relative_pos[FLOCK_SIZE][3];  \/\/ relative X, Z, Theta of all robots$/;"	v
+relative_speed	main.c	/^float relative_speed[FLOCK_SIZE][2];  \/\/ Speeds calculated with Reynold's rules$/;"	v
+reset	main.c	/^void reset(void)$/;"	f
+reynolds_rules	main.c	/^void reynolds_rules()$/;"	f
+robot_id	main.c	/^int robot_id;$/;"	v
+robot_name	main.c	/^char *robot_name;$/;"	v
+send	main.c	/^int send =0;$/;"	v
+send_ping	main.c	/^void send_ping(void)$/;"	f
+speed	main.c	/^float speed[FLOCK_SIZE][2];  \/\/ Speeds calculated with Reynold's rules$/;"	v
+t	main.c	/^int t;$/;"	v
+theta_robots	main.c	/^float theta_robots[FLOCK_SIZE];$/;"	v
+update_self_motion	main.c	/^void update_self_motion(int msl, int msr)$/;"	f
+wait	main.c	/^void wait(unsigned long num)$/;"	f

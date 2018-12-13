@@ -1,4 +1,3 @@
-
 /*
     Copyright 2007 Alexandre Campo, Alvaro Gutierrez, Valentin Longchamp.
 
@@ -41,6 +40,11 @@ int getselector()
     return SELECTOR0 + 2*SELECTOR1 + 4*SELECTOR2 + 8*SELECTOR3;
 }
 
+void wait(unsigned long num)
+{
+	while (num > 0) {num--;}
+}
+
 void obstacleAvoidance();
 
 int main()
@@ -49,7 +53,7 @@ int main()
     e_init_port();
     e_init_ad_scan();
     e_init_uart1();
-    e_led_clear();	
+    e_led_clear();
     e_init_motors();
     e_start_agendas_processing();
 
@@ -57,7 +61,7 @@ int main()
     //btcomWaitForCommand('s');
     //btcomSendString("==== READY - IR TESTING ====\n\n");
 
-    e_calibrate_ir(); 
+    e_calibrate_ir();
 
     // initialize ircom and start reading
     ircomStart();
@@ -65,20 +69,27 @@ int main()
     ircomListen();
 
     // rely on selector to define the role
-    int selector = getselector();
-
+   int selector = getselector();
+   char tmp[128];
+   sprintf(tmp, "direction=%d \n", selector);
+   btcomSendString(tmp);
     // show selector choosen
-    int i;
+
+    e_set_speed_left(500);
+    e_set_speed_right(500);
+    wait(100000);
+    btcomSendString("ALLUMAGE");
+   int i;
     long int j;
     for (i = 0; i < selector; i++)
     {
 	e_led_clear();
-	
+
 	for(j = 0; j < 200000; j++)
 	    asm("nop");
-	
+
 	e_set_led(i%8, 1);
-	
+
 	for(j = 0; j < 300000; j++)
 	    asm("nop");
 
@@ -93,7 +104,7 @@ int main()
 
     // acting as sender
     if (selector == 1)
-    {    	
+    {
 	btcomSendString("==== EMITTER ====\n\n");
 
 	int i;
@@ -102,13 +113,13 @@ int main()
 	    // takes ~15knops for a 32window, avoid putting messages too close...
 	    for(j = 0; j < 100000; j++)	asm("nop");
 
-	    ircomSend(i % 256);	    
+	    ircomSend(i % 256);
 	    while (ircomSendDone() == 0);
 
 	    btcomSendString(".");
 	}
     }
-    
+
     // acting as receiver
     else if (selector == 2)
     {
@@ -124,15 +135,15 @@ int main()
 	    {
 			e_set_led(1, 2);
 		int val = (int) imsg.value;
-	    
-		/* Send Value*/		
+
+		/* Send Value*/
 		char tmp[128];
 		sprintf(tmp, "Receive successful : %d  - distance=%f \t direction=%f \n", val, (double)imsg.distance, (double)imsg.direction);
 		btcomSendString(tmp);
 	    }
 	    else if (imsg.error > 0)
 	    {
-		btcomSendString("Receive failed \n");		
+		btcomSendString("Receive failed \n");
 	    }
 	    // else imsg.error == -1 -> no message available in the queue
 
@@ -140,27 +151,27 @@ int main()
 	}
     }
     // no proper role defined...
-    else 
+    else
     {
 	int i = 0;
 	long int j;
 	while(1)
 	{
 	    e_led_clear();
-	    
+
 	    for(j = 0; j < 200000; j++)
 		asm("nop");
-	    
+
 	    e_set_led(i, 1);
-	    
+
 	    for(j = 0; j < 300000; j++)
 		asm("nop");
-	    
+
 	    i++;
 	    i = i%8;
-	}	
-    }    
-    
+	}
+    }
+
     ircomStop();
     return 0;
 }
@@ -168,8 +179,8 @@ int main()
 int obstacleAvoidanceThreshold = 30.0;
 int obstacleAvoidanceSpeed = 500.0;
 void obstacleAvoidance()
-{    
-    // check if an obstacle is perceived 
+{
+    // check if an obstacle is perceived
     double reading = 0.0;
     int obstaclePerceived = 0;
     int i=0;
@@ -177,18 +188,21 @@ void obstacleAvoidance()
     for (i = 0; i < 8; i++)
     {
         reading = e_get_calibrated_prox(i);
-	// if signal above noise
+	// if signal above noisevoid wait(unsigned long num) {
+	while (num > 0) {num--;}
+}
+
 	if(reading >= obstacleAvoidanceThreshold)
 	{
 	    obstaclePerceived = 1;
-	    
+
 	    // compute direction to escape
 	    double signal = reading - obstacleAvoidanceThreshold;
 	    x += -cos(sensorDir[i]) * signal / 8.0;
 	    y += sin(sensorDir[i]) * signal / 8.0;
 	}
     }
-    
+
     // no obstacles to avoid, return immediately
     if (obstaclePerceived == 0)
     {
@@ -199,12 +213,12 @@ void obstacleAvoidance()
 	// return obstaclePerceived;
 	return;
     }
-    
+
     double desiredAngle = atan2 (y, x);
-    
+
     double leftSpeed = 0.0;
     double rightSpeed = 0.0;
-    
+
     // turn left
     if (desiredAngle >= 0.0)
     {
@@ -217,15 +231,15 @@ void obstacleAvoidance()
 	leftSpeed = 1;
 	rightSpeed = cos(desiredAngle);
     }
-    
+
     // rescale values
     leftSpeed *= obstacleAvoidanceSpeed;
     rightSpeed *= obstacleAvoidanceSpeed;
-    
+
     // change movement direction
     e_set_speed_left(leftSpeed);
     e_set_speed_right(rightSpeed);
-    
+
     // advertise obstacle avoidance in progress
-    // return 1;
+    return 1;
 }
