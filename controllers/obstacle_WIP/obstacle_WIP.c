@@ -34,12 +34,12 @@
 #define DELTA_T 0.064        // Timestep (seconds)
 
 #define RULE1_THRESHOLD  0.05  // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT (0.7 / 10)  // Weight of aggregation rule. default 0.6/10
+#define RULE1_WEIGHT (0.8 / 10)  // Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD  0.15 // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.6 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT (0.02 / 10)  // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT (0.55 / 10)  // Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT (0.4 / 10)  // Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -250,7 +250,7 @@ void reynolds_rules() {
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (robot_id != i) {
-      if(sqrt(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2)) < RULE2_THRESHOLD) {
+      if(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2) < RULE2_THRESHOLD) {
         for (j=0;j<2;j++) {
             dispersion[j] -= 1/relative_pos[i][j];
         }
