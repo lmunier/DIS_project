@@ -57,8 +57,9 @@ typedef char int8_t;            //127
 
 #define MARGINAL_THRESHOLD 40
 
-#define TIMEOUT 100
-#define SEND_TIME 10
+#define SENDING_TIME 100
+#define MESSAGE_INTERVAL_TIME 10
+#define TIME_CHANGE_STATE 1000
 
 /*Adding correction factor*/
 #define K_X	1.0
@@ -70,11 +71,14 @@ typedef char int8_t;            //127
 #define EMITTER 1
 #define RECEIVER 0
 
+#define ON 1
+#define OFF 0
 // for obstacle avoidance
 //int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
 int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};
 // Unique and normalized (between 0 and FLOCK_SIZE-1) robot ID
 int robot_id;
+int cmd = 0;
 
 float relative_pos[FLOCK_SIZE][3];  // relative X, Z, Theta of all robots
 float prev_relative_pos[FLOCK_SIZE][3]; // Previous relative  X, Z, Theta values
@@ -97,6 +101,7 @@ uint16_t timer_count=0;
 int8_t   timer_reset=0;
 int8_t   timer_done[NB_TASK] = {0,0};
 int next_emitterID=0;
+int nb = 0;
 
 // Nasty arrays in our code
 char tmp[128];
@@ -147,14 +152,18 @@ int main()
 
   reset();
 
+  // e_set_led(5,ON);
+  // wait(1000);
+  // e_set_led(5,OFF);
+
   wait(TIME_STEP);
 
   ircomStart();
   ircomEnableContinuousListening();
   ircomListen();
 
-  wait(TIME_STEP);
-  btcomSendString("ALLUMAGE\n");
+  // wait(TIME_STEP);
+  // btcomSendString("ALLUMAGE\n");
 
   while(TRUE)
   {
@@ -191,9 +200,17 @@ int main()
       bmsl += 200;//66;
       bmsr += 200;//72;
 
+      // e_set_led(4,ON);
+      // wait(1000);
+      // e_set_led(4,OFF);
+
       /* state_robotand get information */
     if(state_robot== EMITTER)
       send_ping();  // sending a ping to other robot, so they can measure their
+
+      // e_set_led(6,ON);
+      // wait(1000);
+      // e_set_led(6,OFF);
 
     /// Compute self position-pedantic
     prev_my_position[0] = my_position[0];
@@ -227,8 +244,8 @@ int main()
     msl += bmsl;
     msr += bmsr;
 
-    e_set_speed_left(0);
-    e_set_speed_right(0);
+    e_set_speed_left(msl);
+    e_set_speed_right(msr);
 
     wait(TIME_STEP);
   }
@@ -446,28 +463,41 @@ void reynolds_rules()
 
 void send_ping(void)
 {
-  btcomSendString("J'envoie\n");
+  //btcomSendString("J'envoie\n");
   // Reset the timer
-  timer_reset = 0;
-  while (timer_reset == 0); // Check that the timer has been reset
-  while(timer_count<=TIMEOUT){
+  //timer_reset = 0;
+  //while (timer_reset == 0); // Check that the timer has been reset
+  //while(timer_count<=SENDING_TIME){
 
     // sprintf(tmp,"delta t: %d\n", timer_count);
     // btcomSendString(tmp);
 
+    if(cmd == 1)
+      cmd = 0;
+    else
+      cmd = 1;
+
     ircomSend(robot_id);
     while (ircomSendDone() == 0);
-    wait(SEND_TIME);
-  }
+    nb++;
+    if(nb == 5){
+      nb = 0;
+      state_robot = RECEIVER;
+      next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
+      timer_reset = 0;
+      while(timer_reset == 0);
+    }
+    //wait(MESSAGE_INTERVAL_TIME);
+  //}
   // sprintf(tmp,"time apres 5 msg: %d\n", timer_count);
   // btcomSendString(tmp);
 
-  state_robot = RECEIVER;
-
-  timer_reset = 0;
-  while(timer_reset == 0);
-
-  next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
+  // state_robot = RECEIVER;
+  //
+  // timer_reset = 0;
+  // while(timer_reset == 0);
+  //
+  // next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
 }
 
 ////////////////////* Processs receive message *////////////////////////////////
@@ -478,7 +508,7 @@ void process_received_ping_messages(void)
   float message_rssi;  // Received Signal Strength indicator
   float range;
   int emitter_id;
-
+  btcomSendString("Je recois\n");
   IrcomMessage imsg;
   ircomPopMessage(&imsg);
 
@@ -488,14 +518,16 @@ void process_received_ping_messages(void)
     timer_reset = 0;
     while(timer_reset == 0);
     // sprintf(tmp,"Entre receiver: %d\n", timer_count);
-    // btcomSendString(tmp);
+    // btcomSendString("Je recois\n");
 
     message_direction = (float)imsg.direction;
     message_rssi = (float)imsg.distance;
     emitter_id = (int)imsg.value;
 
+    e_set_led(robot_id, emitter_id);
+
     // sprintf(tmp,"emitter_id: %d\n", emitter_id);
-    btcomSendString("Message bien recu\n");
+    // btcomSendString("Message bien recu\n");
 
     relative_pos[emitter_id][2] = message_direction;
     relative_pos[emitter_id][2] += my_position[2];  // find the relative theta;
@@ -520,16 +552,23 @@ void process_received_ping_messages(void)
     ircomPopMessage(&imsg);
   }
 
-  // sprintf(tmp, "time entre 2 msg=%d \n", timer_count);
-  // btcomSendString(tmp);
+  sprintf(tmp, "time entre 2 msg=%d \n", timer_count);
+  btcomSendString(tmp);
 
-  if(timer_count >= TIMEOUT){
+  // if(timer_count >= TIME_CHANGE_STATE){
+  //   next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
+  //   // sprintf(tmp, "next_emitterID inside=%d \n", next_emitterID);
+  //   // btcomSendString(tmp);
+  //
+  //   if(next_emitterID == robot_id){
+  //     state_robot= EMITTER;
+  //   }
+  // }
+
+  if(timer_count > 300){
     next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
-    // sprintf(tmp, "next_emitterID inside=%d \n", next_emitterID);
-    // btcomSendString(tmp);
-
     if(next_emitterID == robot_id){
-      state_robot= EMITTER;
-    }
+        state_robot= EMITTER;
+      }
   }
 }
