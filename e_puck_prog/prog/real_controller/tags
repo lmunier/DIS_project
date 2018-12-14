@@ -4,54 +4,74 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.9~svn20110310	//
-ABS	real_controller.c	49;"	d	file:
-AXLE_LENGTH	real_controller.c	32;"	d	file:
-DELTA_T	real_controller.c	35;"	d	file:
-FLOCK_SIZE	real_controller.c	29;"	d	file:
-K_TH	real_controller.c	56;"	d	file:
-K_U	real_controller.c	57;"	d	file:
-K_W	real_controller.c	58;"	d	file:
-K_X	real_controller.c	54;"	d	file:
-K_Y	real_controller.c	55;"	d	file:
-MARGINAL_THRESHOLD	real_controller.c	51;"	d	file:
-MAX_SENS	real_controller.c	27;"	d	file:
-MAX_SPEED	real_controller.c	28;"	d	file:
-MIGRATION_WEIGHT	real_controller.c	45;"	d	file:
-MIGRATORY_URGE	real_controller.c	47;"	d	file:
-MIN_SENS	real_controller.c	26;"	d	file:
-M_PI	real_controller.c	24;"	d	file:
-NB_SENSORS	real_controller.c	25;"	d	file:
-RULE1_THRESHOLD	real_controller.c	37;"	d	file:
-RULE1_WEIGHT	real_controller.c	38;"	d	file:
-RULE2_THRESHOLD	real_controller.c	40;"	d	file:
-RULE2_WEIGHT	real_controller.c	41;"	d	file:
-RULE3_WEIGHT	real_controller.c	43;"	d	file:
-SPEED_UNIT_RADS	real_controller.c	33;"	d	file:
-TIME_STEP	real_controller.c	30;"	d	file:
-TRUE	real_controller.c	31;"	d	file:
-WHEEL_RADIUS	real_controller.c	34;"	d	file:
+ABS	real_controller.c	56;"	d	file:
+AXLE_LENGTH	real_controller.c	39;"	d	file:
+DELTA_T	real_controller.c	42;"	d	file:
+EMITTER	real_controller.c	70;"	d	file:
+FLOCK_SIZE	real_controller.c	36;"	d	file:
+K_TH	real_controller.c	66;"	d	file:
+K_U	real_controller.c	67;"	d	file:
+K_W	real_controller.c	68;"	d	file:
+K_X	real_controller.c	64;"	d	file:
+K_Y	real_controller.c	65;"	d	file:
+MARGINAL_THRESHOLD	real_controller.c	58;"	d	file:
+MAX_SENS	real_controller.c	34;"	d	file:
+MAX_SPEED	real_controller.c	35;"	d	file:
+MIGRATION_WEIGHT	real_controller.c	52;"	d	file:
+MIGRATORY_URGE	real_controller.c	54;"	d	file:
+MIN_SENS	real_controller.c	33;"	d	file:
+M_PI	real_controller.c	31;"	d	file:
+NB_SENSORS	real_controller.c	32;"	d	file:
+NB_TASK	real_controller.c	95;"	d	file:
+RECEIVER	real_controller.c	71;"	d	file:
+RULE1_THRESHOLD	real_controller.c	44;"	d	file:
+RULE1_WEIGHT	real_controller.c	45;"	d	file:
+RULE2_THRESHOLD	real_controller.c	47;"	d	file:
+RULE2_WEIGHT	real_controller.c	48;"	d	file:
+RULE3_WEIGHT	real_controller.c	50;"	d	file:
+SEND_TIME	real_controller.c	61;"	d	file:
+SPEED_UNIT_RADS	real_controller.c	40;"	d	file:
+TIMEOUT	real_controller.c	60;"	d	file:
+TIME_STEP	real_controller.c	37;"	d	file:
+TRUE	real_controller.c	38;"	d	file:
+WHEEL_RADIUS	real_controller.c	41;"	d	file:
 compute_wheel_speeds	real_controller.c	/^void compute_wheel_speeds(int *msl, int *msr)$/;"	f
 e_puck_matrix	real_controller.c	/^int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};$/;"	v
+first_msg	real_controller.c	/^int first_msg = 0;$/;"	v
 getselector	real_controller.c	/^int getselector()$/;"	f
 init_pos	real_controller.c	/^int init_pos = 0;$/;"	v
 initialized	real_controller.c	/^float initialized[FLOCK_SIZE];  \/\/ != 0 if initial positions have been received$/;"	v
+int16_t	real_controller.c	/^typedef int int16_t;            \/\/32768$/;"	t	file:
+int8_t	real_controller.c	/^typedef char int8_t;            \/\/127$/;"	t	file:
+last_msg_time	real_controller.c	/^unsigned long last_msg_time=0;$/;"	v
 limit	real_controller.c	/^void limit(int *number, int limit)$/;"	f
 main	real_controller.c	/^int main()$/;"	f
 migr	real_controller.c	/^float migr[2] = {0, 5};    \/\/ Migration vector$/;"	v
 my_position	real_controller.c	/^float my_position[3];                 \/\/ X, Z, Theta of the current robot$/;"	v
+nb_process	real_controller.c	/^int nb_send = 0, nb_process = 0, received = 0;$/;"	v
+nb_send	real_controller.c	/^int nb_send = 0, nb_process = 0, received = 0;$/;"	v
+nextID	real_controller.c	/^int nextID=0;$/;"	v
 prev_my_position	real_controller.c	/^float prev_my_position[3];   \/\/ X, Z, Theta of the current robot in the previous$/;"	v
 prev_relative_pos	real_controller.c	/^float prev_relative_pos[FLOCK_SIZE][3]; \/\/ Previous relative  X, Z, Theta values$/;"	v
 process_received_ping_messages	real_controller.c	/^void process_received_ping_messages(void)$/;"	f
+received	real_controller.c	/^int nb_send = 0, nb_process = 0, received = 0;$/;"	v
 relative_pos	real_controller.c	/^float relative_pos[FLOCK_SIZE][3];  \/\/ relative X, Z, Theta of all robots$/;"	v
 relative_speed	real_controller.c	/^float relative_speed[FLOCK_SIZE][2];  \/\/ Speeds calculated with Reynold's rules$/;"	v
 reset	real_controller.c	/^void reset(void)$/;"	f
 reynolds_rules	real_controller.c	/^void reynolds_rules()$/;"	f
 robot_id	real_controller.c	/^int robot_id;$/;"	v
 robot_name	real_controller.c	/^char *robot_name;$/;"	v
-send	real_controller.c	/^int send =0;$/;"	v
+send	real_controller.c	/^int send = RECEIVER;$/;"	v
 send_ping	real_controller.c	/^void send_ping(void)$/;"	f
+silly_timer	real_controller.c	/^void silly_timer(void)$/;"	f
 speed	real_controller.c	/^float speed[FLOCK_SIZE][2];  \/\/ Speeds calculated with Reynold's rules$/;"	v
-t	real_controller.c	/^int t;$/;"	v
 theta_robots	real_controller.c	/^float theta_robots[FLOCK_SIZE];$/;"	v
+timer_count	real_controller.c	/^uint16_t timer_count=0;$/;"	v
+timer_done	real_controller.c	/^int8_t   timer_done[NB_TASK] = {0,0};$/;"	v
+timer_reset	real_controller.c	/^int8_t   timer_reset=0;$/;"	v
+tmp	real_controller.c	/^char tmp[128];$/;"	v
+uint16_t	real_controller.c	/^typedef unsigned int uint16_t;  \/\/ 65300$/;"	t	file:
+uint8_t	real_controller.c	/^typedef unsigned char uint8_t;  \/\/255$/;"	t	file:
 update_self_motion	real_controller.c	/^void update_self_motion(int msl, int msr)$/;"	f
-wait	real_controller.c	/^void wait(unsigned long num)$/;"	f
+wait	real_controller.c	/^void wait(uint16_t ms)$/;"	f
+wait_task	real_controller.c	/^void wait_task(void)$/;"	f

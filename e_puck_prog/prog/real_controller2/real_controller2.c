@@ -20,13 +20,6 @@
 #include <ircom/ircom.h>
 #include <btcom/btcom.h>
 #include <math.h>
-#include <time.h>
-
-/*Fancy definitions*/
-typedef unsigned int uint16_t;  // 65300
-typedef int int16_t;            //32768
-typedef unsigned char uint8_t;  //255
-typedef char int8_t;            //127
 
 #define M_PI 3.14
 #define NB_SENSORS 8   // Number of distance sensors
@@ -34,7 +27,7 @@ typedef char int8_t;            //127
 #define MAX_SENS 4096  // Maximum sensibility value
 #define MAX_SPEED 800  // Maximum speed
 #define FLOCK_SIZE 2  // Size of flock
-#define TIME_STEP 64  // [ms] Length of time step
+#define TIME_STEP 64000  // [ms] Length of time step
 #define TRUE 1        // true value
 #define AXLE_LENGTH 0.052  // Distance between wheels of robot (meters)
 #define SPEED_UNIT_RADS 0.00628  // Conversion factor from speed unit to radian per second
@@ -57,9 +50,6 @@ typedef char int8_t;            //127
 
 #define MARGINAL_THRESHOLD 40
 
-#define TIMEOUT 500
-#define SEND_TIME 100
-
 /*Adding correction factor*/
 #define K_X	1.0
 #define K_Y	1.0
@@ -67,13 +57,10 @@ typedef char int8_t;            //127
 #define K_U 	0.2   // Forward control coefficient
 #define K_W 	1  	  // Rotational control coefficient
 
-#define EMITTER 1
-#define RECEIVER 0
-
 // for obstacle avoidance
 //int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
 int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};
-// char value[128];
+
 // Unique and normalized (between 0 and FLOCK_SIZE-1) robot ID
 int robot_id;
 
@@ -87,24 +74,12 @@ float speed[FLOCK_SIZE][2];  // Speeds calculated with Reynold's rules
 float initialized[FLOCK_SIZE];  // != 0 if initial positions have been received
 float migr[2] = {0, 5};    // Migration vector
 char *robot_name;
-int send = RECEIVER;
+int send =0;
 
 float theta_robots[FLOCK_SIZE];
 int init_pos = 0;
-
-#define NB_TASK 2
-unsigned long last_msg_time=0;
-uint16_t timer_count=0;
-int8_t   timer_reset=0;
-int8_t   timer_done[NB_TASK] = {0,0};
+int t;
 int nb_send = 0, nb_process = 0, received = 0;
-int nextID=0;
-int first_msg = 0;
-
-
-// Nasty arrays in our code
-char tmp[128];
-
 
 /*int relative_pos[FLOCK_SIZE][3];  // relative X, Z, Theta of all robots
 int prev_relative_pos[FLOCK_SIZE][3]; // Previous relative  X, Z, Theta values
@@ -127,7 +102,10 @@ int getselector()
   return SELECTOR0 + 2*SELECTOR1 + 4*SELECTOR2 + 8*SELECTOR3;
 }
 
-
+void wait(unsigned long num)
+{
+	while (num > 0) {num--;}
+}
 //////////////////* Definition des fonctions *//////////////////////////////////
 
 void reset(void);
@@ -137,8 +115,6 @@ void compute_wheel_speeds(int *, int *);
 void reynolds_rules(void);
 void send_ping(void);
 void process_received_ping_messages(void);
-void wait(uint16_t ms);
-void silly_timer(void);
 
 /////////////////////////* the main function    */////////////
 int main()
@@ -156,13 +132,24 @@ int main()
   ircomListen();
 
   wait(TIME_STEP);
-  btcomSendString("ALLUMAGE\n");
+    btcomSendString("ALLUMAGE");
+    // rely on selector to define the role
+  /* int selector = getselector();
+   char tmp[128];
+   sprintf(tmp, "selector=%d \n", selector);
+   btcomSendString(tmp);
+    // show selector choosen
+
+    e_set_speed_left(500);
+    e_set_speed_right(500);
+    btcomSendString("COINCOIN\n");
+    wait(100000);
+    btcomSendString("ALLUMAGE\n");*/
 
   while(TRUE)
   {
     bmsl = 0; bmsr = 0; sum_sensors = 0; max_sens = 0;
-    sprintf(tmp, "State : %d\n", send);
-		btcomSendString(tmp);
+
     /* Braitenberg */
     for (i = 0; i < NB_SENSORS; i++)
     {
@@ -192,8 +179,9 @@ int main()
       bmsr += 200;//72;
 
       /* Send and get information */
-    if(send == EMITTER)
+    if(send == 1)
       send_ping();  // sending a ping to other robot, so they can measure their
+                      // distance to this robot-pedantic
 
     /// Compute self position-pedantic
     prev_my_position[0] = my_position[0];
@@ -202,9 +190,10 @@ int main()
 
     update_self_motion(msl, msr);
     wait(TIME_STEP);
-    if(send == RECEIVER)
+    if(send == 0)
+    while(1){
       process_received_ping_messages();
-
+    }
     speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
     speed[robot_id][1] = (1 / DELTA_T) * (my_position[1] - prev_my_position[1]);
 
@@ -212,7 +201,6 @@ int main()
     reynolds_rules();
 
     // Compute wheels speed from reynold's speed
-
     compute_wheel_speeds(&msl, &msr);
 
     // Adapt speed instinct to distance sensor values
@@ -229,64 +217,33 @@ int main()
     e_set_speed_left(0);
     e_set_speed_right(0);
 
-    wait(TIME_STEP);
+    wait(4*TIME_STEP);
   }
 
   return 0;
 
 }
 /////////////////////////Implementation des fonctions /////////////////////////
-void silly_timer(void)
-{
-  if(timer_reset == 0)
-  {
-    timer_done[0] = 0;
-    timer_count   = 0;
-    timer_reset   = 1;
-  }
-  else
-  {
-    timer_count++;
-    timer_done[0] = 1;
-  }
-  if(timer_count%100 == 0){
-    sprintf(tmp, "Time %d \n", timer_count);
-    btcomSendString(tmp);
-  }
-}
-
-void wait_task(void)
-{
-  timer_done[1]=1;
-}
-
-void wait(uint16_t ms)
-{
-  timer_done[1] = 0;
-  e_activate_agenda(wait_task,10*ms);
-  while(timer_done[1]==0);
-  e_destroy_agenda(wait_task);
-  return;
-}
 
 ///////////////* Reset le robot  et recupere l'ID du robot *///////////////////
 
 void reset(void)
 {
-  e_init_port();
-  e_init_ad_scan();
-  e_init_uart1();
-  e_led_clear();
-  e_init_motors();
-  e_start_agendas_processing();
-  e_calibrate_ir();
-  e_activate_agenda(silly_timer,10);
+
+    e_init_port();
+    e_init_ad_scan();
+    e_init_uart1();
+    e_led_clear();
+    e_init_motors();
+    e_start_agendas_processing();
+    e_calibrate_ir();
 
   int i;
   robot_id = getselector();
 
-  sprintf(tmp, "reset_robot_id=%d \n", robot_id);
-  btcomSendString(tmp);
+  char reset[128];
+  sprintf(reset, "reset_robot_id=%d \n", robot_id);
+  btcomSendString(reset);
 
   for(i=0; i<3; i++)
   {
@@ -303,8 +260,8 @@ void reset(void)
      init_pos = 1;
 
 //  btcomSendString("Reset: robot %d\n", robot_id);
-  if(robot_id == 0)
-    send = EMITTER;
+  if(robot_id ==0)
+    send =1;
 
 }
 
@@ -454,22 +411,14 @@ void reynolds_rules()
 void send_ping(void)
 {
   btcomSendString("Send\n");
-  // Reset the timer
-  timer_reset = 0;
-  while (timer_reset == 0); // Check that the timer has been reset
-
-  uint16_t old_timer = timer_count;
-  while((timer_count-old_timer)<=TIMEOUT){
-  /*  char deltaT[32];*/
-    sprintf(tmp,"DELTA_T: %d\n", timer_count-old_timer);
-    btcomSendString(tmp);
-    ircomSend(robot_id);
-    while (ircomSendDone() == 0);
+  if (nb_send == 100) {
+    send = 0;
+    nb_send = 0;
+  }else
     nb_send++;
-    wait(SEND_TIME);
-  }
-  send = RECEIVER;
-  first_msg = 0;
+
+  ircomSend(robot_id);
+  while (ircomSendDone() == 0);
 }
 
 ////////////////////* Processs receive message *////////////////////////////////
@@ -480,27 +429,38 @@ void process_received_ping_messages(void)
   float message_rssi;  // Received Signal Strength indicator
   float range;
   int other_robot_id;
+  int nextID;
   int emitter_id;
-
-  IrcomMessage imsg;
-  ircomPopMessage(&imsg);
-
-  while(imsg.error != -1)
-  {
-    if(first_msg == 0){
-      first_msg = 1;
-    }
-    last_msg_time = timer_count;
+  btcomSendString("Process\n");
+ IrcomMessage imsg;
+ ircomPopMessage(&imsg);
+ if(nb_process == 100 && received == 1){
+   nb_process = 0;
+ }
+ while(imsg.error != -1)
+ {
+   nb_process++;
+   char value2[128];
+   sprintf(value2, "nb_process=%d \n", nb_process);
+   btcomSendString(value2);
     message_direction = (float)imsg.direction;
     message_rssi = (float)imsg.distance;
     emitter_id = (int)imsg.value;
-    other_robot_id=emitter_id;
-    sprintf(tmp,"emitter_id: %d\n", emitter_id);
-    btcomSendString(tmp);
+
+    char value[128];
+    sprintf(value, "emitter_id=%d \n", emitter_id);
+    btcomSendString(value);
+
+    nextID = (emitter_id+1)%FLOCK_SIZE;
+    sprintf(value, "nextID=%d \n", nextID);
+		if(nextID == robot_id){
+			send = 1;
+		}
 
     relative_pos[other_robot_id][2] = message_direction;
     relative_pos[other_robot_id][2] += my_position[2];  // find the relative theta;
     range = message_rssi;
+
     if(init_pos == 1) {
       my_position[0] = range*cos(relative_pos[other_robot_id][2]);
       my_position[1] = -1.0 * range*sin(relative_pos[other_robot_id][2]);
@@ -518,18 +478,7 @@ void process_received_ping_messages(void)
       relative_speed[other_robot_id][0] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][0]-prev_relative_pos[other_robot_id][0]);
       relative_speed[other_robot_id][1] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][1]-prev_relative_pos[other_robot_id][1]);
     }
+    wait(TIME_STEP);
     ircomPopMessage(&imsg);
-  }
-
-  sprintf(tmp, "TIMEOUT=%ld \n", timer_count-last_msg_time);
-  btcomSendString(tmp);
-
-  if(((timer_count-last_msg_time) >= TIMEOUT) && (first_msg == 1)){
-    nextID = (nextID+1)%FLOCK_SIZE;
-    sprintf(tmp, "nextID inside=%d \n", nextID);
-    btcomSendString(tmp);
-  }
-  if(nextID == robot_id){
-    send = EMITTER;
   }
 }
