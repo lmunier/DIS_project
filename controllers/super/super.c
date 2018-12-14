@@ -10,7 +10,7 @@
 #include <webots/supervisor.h>
 
 #define METRICS
-#define FLOCK_SIZE	1		// Number of robots in flock
+#define FLOCK_SIZE	5		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
@@ -27,7 +27,7 @@ float loc[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
 float relative_loc[FLOCK_SIZE][3] = {0};          // Relative location of everybody in the flock
 
 int offset;			// Offset of robots number
-float migr[2] = {0, 5};	           // Migration vector
+float migr[2] = {0, -5};	           // Migration vector
 float orient_migr; 			// Migration orientation
 int t;
 bool init = false;

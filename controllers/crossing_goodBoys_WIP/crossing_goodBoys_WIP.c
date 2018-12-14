@@ -10,7 +10,9 @@
 #include <string.h>
 
 #include <webots/robot.h>
+/*Webots 2018b*/
 #include <webots/motor.h>
+/*Webots 2018b*/
 #include <webots/differential_wheels.h>
 #include <webots/distance_sensor.h>
 #include <webots/emitter.h>
@@ -23,32 +25,33 @@
 #define DELTA_T			0.064	         // Timestep (seconds)
 
 #define AXE_LENGTH 		0.052		// Distance between wheels of robot (meters)
-#define SPEED_UNIT_RADS 	0.00628 	// Conversion factor from speed unit to radian per second
+#define SPEED_UNIT_RADS 0.00628  // Conversion factor from speed unit to radian per second
 #define WHEEL_RADIUS 		0.0205		// Wheel radius (meters)
 #define PI			3.1415
 
 #define NB_SENSORS		8		// Number of IR sensors
-#define MIN_SENS          	350     	// Minimum sensibility value
+#define MIN_SENS          	300     	// Minimum sensibility value
 #define MAX_SENS          	4096    	// Maximum sensibility value
 #define MAX_SPEED         	800     	// Maximum speed
+/*Webots 2018b*/
 #define MAX_SPEED_WEB 		6.28 		// Maximum speed webots
+/*Webots 2018b*/
 
 #define RULE1_THRESHOLD     	0.20   		// Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT       	(0.6/10)	// Weight of aggregation rule. default 0.6/10
+#define RULE1_WEIGHT       	0.2	// Weight of aggregation rule. default 0.6/10
 #define RULE2_THRESHOLD     	0.15   		// Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT       	(0.02/10)	// Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT       	(0.03/10)	// Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT        	(1.0/10)   	// Weight of consistency rule. default 1.0/10
-#define MARGINAL_THRESHOLD       0.4        // Distance to take an e-puck into a group
-#define MIGRATION_WEIGHT    	(0.01/10)   	// Wheight of attraction towards the common goal. default 0.01/10
-#define MIGRATORY_URGE 1	// Tells the robots if they should just go forward or move towards a specific migratory direction
+#define MARGINAL_THRESHOLD       0.22        // Distance to take an e-puck into a group
+#define MIGRATION_WEIGHT    	(0.03/10)   	// Wheight of attraction towards the common goal. default 0.01/10
 
 /*Adding correction factor*/
 #define K_X	1.0
 #define K_Z	1.0
 #define K_TH 1.0
 #define K_U 0.2 // Forward control coefficient
-#define K_W 1   // Rotational control coefficient
-
+#define K_W 1.0   // Rotational control coefficient
+int t;
 // Define the group of the e-puck were we are
 #define BAD_BOYS // If we are not a bad boys, we are a good boys
 bool bad_group;
@@ -56,8 +59,7 @@ bool bad_group;
 WbDeviceTag left_motor; 			// Handler for left wheel of the robot
 WbDeviceTag right_motor; 			// Handler for the right wheel of the robot
 
-//RIGHT,LEFT
-int e_puck_matrix[16] = {10,30,35,40,10,-40,-60,-70,-70,-60,-40,10,40,35,30,10}; // for obstacle avoidance
+int e_puck_matrix[16] = {17,  29,  34,  10, 8, -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18}; // for obstacle avoidance
 
 WbDeviceTag ds[NB_SENSORS];			// Handle for the infrared distance sensors
 WbDeviceTag receiver2;				// Handle for the receiver node
@@ -66,15 +68,14 @@ WbDeviceTag emitter2;				// Handle for the emitter node
 struct robot{
 	int ID;						// ID of myself
 	int init;					// Control if initialized, 0=not, 1=yes
-	double distances[FLOCK_SIZE][2];		// Store the distances between myself and other robots
-	double previousDistances[FLOCK_SIZE][2];	// Store the previous distances between myself and other robots
-	double relAngle[FLOCK_SIZE];			// Store the relative angle of the other robots
-	double speed[FLOCK_SIZE][2];			// Store the relative speed of the other robots and the speed of myself
-	double my_position[3];				// Initial position of myself: X, Z and theta
-	double my_previous_position[3];			// Initial position of myself: X, Z and theta
-	double migr[2];					// Position for the migratory urge
-	int send;
-	double absSpeed[FLOCK_SIZE][2];			       		
+	float distances[FLOCK_SIZE][2];		// Store the distances between myself and other robots
+	float previousDistances[FLOCK_SIZE][2];	// Store the previous distances between myself and other robots
+	float relAngle[FLOCK_SIZE];			// Store the relative angle of the other robots
+	float speed[FLOCK_SIZE][2];			// Store the relative speed of the other robots and the speed of myself
+	float my_position[3];				// Initial position of myself: X, Z and theta
+	float my_previous_position[3];			// Initial position of myself: X, Z and theta
+	float migr[2];					// Position for the migratory urge
+	int send;	       		
 }myself;
 
 /*
@@ -87,7 +88,6 @@ static void reset() {
     bad_group = false;
   #endif
 
-  int robot_id_u = 0; 
   char* robot_name;
   wb_robot_init();
 
@@ -121,8 +121,8 @@ static void reset() {
   // robots to the simulation!
 
   // read robot id from the robot's name
-  sscanf(robot_name, "epuck%d", &robot_id_u);
-  myself.ID = robot_id_u % FLOCK_SIZE;  // normalize between 0 and FLOCK_SIZE-1
+  sscanf(robot_name, "epuck%d", &(myself.ID));
+  myself.ID %= FLOCK_SIZE;  // normalize between 0 and FLOCK_SIZE-1
 
   for(i=0;i<FLOCK_SIZE;i++) {
 		myself.distances[i][0] = 0;            	// Initialize distance tab X
@@ -132,9 +132,6 @@ static void reset() {
     myself.relAngle[i] = 0;                	// Initialize relative angle tab
     myself.speed[i][0] = 0;                	// Initialize speed tab X
     myself.speed[i][1] = 0;                	// Initialize speed tab Z
-		myself.absSpeed[i][0] = 0;
-		myself.absSpeed[i][1] = 0;
-    myself.init = 0;
   }
 
   myself.my_position[0] = 0;			// Set initial X position of myself to 0
@@ -144,12 +141,15 @@ static void reset() {
 	myself.my_previous_position[1] = 0;			// Set previous Z position of myself to 0
 	myself.my_previous_position[2] = 0;			// Set previous theta position of myself to 0
 
-	if(myself.ID == 0)// || myself.ID == 1)	
+	if(myself.ID == 0){// || myself.ID == 1)	
 		myself.send = 1;
-	else
+    myself.init = 0;
+	} else {
 		myself.send = 0;
+    myself.init = 1;
+  }
         
-  myself.migr[0] = 0;				// Set the X migratory urge
+  myself.migr[0] = 0;	 // Set the X migratory urge
   myself.migr[1] = 5; // Set the Z migratory urge
   
   printf("Reset: robot %d\n",myself.ID);
@@ -167,18 +167,16 @@ void limit(int *number, int limit) {
  * Updates robot position with wheel speeds
  */
 void update_self_motion(int msl, int msr) {
-  float theta = myself.my_position[2];
-
   // Compute deltas of the robot
   float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;	// Compute the translational displacement of the right wheel
   float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;	// Compute the translational displacement of the left wheel
 
   float du = (dr + dl) / 2.0;						// Compute the translational displacement of the epuck
-  float dtheta = (dr - dl) / AXE_LENGTH;					// Compute the angular displacement of the right wheel
+  float dtheta = (dr - dl) / (2.0*AXE_LENGTH);					// Compute the angular displacement of the right wheel
 
   // Compute deltas in the environment
-  float dx = -du * sinf(theta);						// Compute the X translational displacement of the epuck
-  float dz = -du * cosf(theta);						// Compute the Z translational displacement of the epuck
+  float dx = -du * sinf(myself.my_position[2]);						// Compute the X translational displacement of the epuck
+  float dz = -du * cosf(myself.my_position[2]);						// Compute the Z translational displacement of the epuck
 
   // Update position
   myself.my_position[0] += K_X  * dx;
@@ -186,14 +184,10 @@ void update_self_motion(int msl, int msr) {
   myself.my_position[2] += K_TH * dtheta;
 
   // Keep orientation within 0, 2pi
-  if (myself.my_position[2] > 2 * M_PI)
+  if (myself.my_position[2] > 2.0 * M_PI)
       myself.my_position[2] -= 2.0 * M_PI;
   if (myself.my_position[2] < 0)
       myself.my_position[2] += 2.0 * M_PI;
-
-  /* /!\ !!! A VERIFIER !!! /!\ */
-//	myself.absSpeed[myself.ID][0] = (1.0/DELTA_T)*(myself.my_position[0]-myself.my_previous_position[0]);
-//  myself.absSpeed[myself.ID][1] = (1.0/DELTA_T)*(myself.my_position[1]-myself.my_previous_position[1]);
 }
 
 /*
@@ -207,7 +201,7 @@ void compute_wheel_speeds(int *msl, int *msr) {
 	
   // float range = sqrtf(x * x + z * z);    // Distance to the wanted position
   float range = sqrtf(x * x + z * z);    // Norm of the wanted speed vector in robot coordinate
-  float bearing = -atan2(x, z);          // Orientation of the wanted speed vector
+  float bearing = -atan2f(x, z);          // Orientation of the wanted speed vector
 
   float u = K_U * range * cosf(bearing);  // Compute7 forward control
   float w = K_W * bearing;                // Compute rotational control
@@ -267,9 +261,10 @@ void reynolds_rules() {
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (i != myself.ID) {
-      if ((myself.distances[i][0]*myself.distances[i][0] + myself.distances[i][1]*myself.distances[i][1]) < RULE2_THRESHOLD) {
+      if (sqrtf(myself.distances[i][0]*myself.distances[i][0] + myself.distances[i][1]*myself.distances[i][1]) < RULE2_THRESHOLD) {
         for (j = 0; j < 2; j++) {
-          if (myself.distances[i][j] != 0) dispersion[j] -= 1/myself.distances[i][j];
+          if (myself.distances[i][j] != 0)
+            dispersion[j] -= 1/myself.distances[i][j];
         }
       }
     }
@@ -285,17 +280,9 @@ void reynolds_rules() {
     myself.speed[myself.ID][j] = cohesion[j] * RULE1_WEIGHT;
     myself.speed[myself.ID][j] += dispersion[j] * RULE2_WEIGHT;
     myself.speed[myself.ID][j] += consistency[j] * RULE3_WEIGHT;
+    myself.speed[myself.ID][j] += (myself.migr[j] - myself.my_position[j]) * MIGRATION_WEIGHT;
   }
   myself.speed[myself.ID][1] *= -1;  // z axis of webots is inverted
-
-  // move the robot according to some migration rule
-  if (MIGRATORY_URGE == 0) {
-    myself.speed[myself.ID][0] += 0.01 * cos(myself.my_position[2] + M_PI / 2);
-    myself.speed[myself.ID][1] += 0.01 * sin(myself.my_position[2] + M_PI / 2);
-  } else {
-    myself.speed[myself.ID][0] += (myself.migr[0] - myself.my_position[0]) * MIGRATION_WEIGHT;
-    myself.speed[myself.ID][1] -= (myself.migr[1] - myself.my_position[1]) * MIGRATION_WEIGHT;  // z axis of webots is inverted
-  }
 }
 
 /*
@@ -304,7 +291,7 @@ void reynolds_rules() {
  * range and bearing will be measured directly out of message RSSI and direction
  */
 void send_ping(void) {
-  char out[10];
+  char out[10] = {'0'};
   myself.send = 0;
   sprintf(out, "%d", myself.ID);  // in the ping message we send the name of the robot.
   wb_emitter_send(emitter2, out, strlen(out) + 1);
@@ -318,11 +305,9 @@ void send_ping(void) {
 void process_received_ping_messages(void) {
   const double *message_direction = NULL;
   double message_rssi = 0.0;  // Received Signal Strength indicator
-  double abs_theta; // Absolute angle of the other robots
   double range = 0.0;
   char *inbuffer;  // Buffer for the receiver node
-  int emiter_id = 0;
-  int nextID = 0;
+  int emiter_id = 0, nextID = 0;
 
   while (wb_receiver_get_queue_length(receiver2) > 0) {
     inbuffer = (char *)wb_receiver_get_data(receiver2);
@@ -334,23 +319,23 @@ void process_received_ping_messages(void) {
 
     // since the name of the sender is in the received message.
     // Note: this does not work for robots having id bigger than 9!
-    emiter_id = (int)(inbuffer[5] - '0');
+    emiter_id = (int)(inbuffer[0] - '0');
     nextID = (emiter_id+1)%FLOCK_SIZE;	
 
 		if(nextID == myself.ID){
 			myself.send = 1;
     }
 
-    myself.relAngle[emiter_id] = -atan2(z, x);
-    abs_theta = myself.relAngle[emiter_id] + myself.my_position[2]; // Find the absolute theta
-    range = sqrt((1 / message_rssi));
+    myself.relAngle[emiter_id] = -atan2f(z, x);
+    myself.relAngle[emiter_id] += myself.my_position[2]; // Find the absolute theta
+    range = sqrtf((1 / message_rssi));
     // printf("ID: %d, REC: %d, Y: %lf, X: %lf, ANGLe: %lf, OTHER: %lf\n
     // ",robot_id, other_robot_id, message_direction[2], message_direction[0],
     // theta, message_direction[1]);
 
     if (myself.init == 1) {
-      myself.my_position[0] = range * cos(myself.my_position[2]);
-      myself.my_position[1] = -1.0 * range * sin(myself.my_position[2]);
+      myself.my_position[0] = range * cosf(myself.relAngle[emiter_id]);
+      myself.my_position[1] = -1.0 * range * sinf(myself.relAngle[emiter_id]);
       myself.my_position[2] = 0;
 
       // printf("ID: %d, X: %lf, Z: %lf, Theta: %lf\n", robot_id,
@@ -360,11 +345,6 @@ void process_received_ping_messages(void) {
       myself.my_previous_position[1] = myself.my_position[1];  // relative y pos
       myself.my_previous_position[2] = myself.my_position[2];
 
-      /* /!\ !!! A VERIFIER !!! /!\ */
-      // Computation of the absolute speeds
-//		  myself.absSpeed[emmiter_id][0] = myself.absSpeed[myself.ID][0]+myself.speed[emmiter_id][0];
-//      myself.absSpeed[emmiter_id][1] = myself.absSpeed[myself.ID][1]+myself.speed[emmiter_id][1];
-
       myself.init = 0;
     } else {
       // Get position update
@@ -373,10 +353,9 @@ void process_received_ping_messages(void) {
       // 0.2*theta;
       myself.previousDistances[emiter_id][0] = myself.distances[emiter_id][0];
       myself.previousDistances[emiter_id][1] = myself.distances[emiter_id][1];
-      myself.relAngle[emiter_id] = myself.relAngle[emiter_id];
 
-      myself.distances[emiter_id][0] = range * cos(myself.relAngle[emiter_id]);  // relative x pos
-      myself.distances[emiter_id][1] = -1.0 * range * sin(myself.relAngle[emiter_id]);   // relative y pos
+      myself.distances[emiter_id][0] = range * cosf(myself.relAngle[emiter_id]);  // relative x pos
+      myself.distances[emiter_id][1] = -1.0 * range * sinf(myself.relAngle[emiter_id]);   // relative y pos
 
       // printf("Robot %s, from robot %d, x: %g, y: %g, theta %g, my theta
       // %g\n",robot_name,other_robot_id,relative_pos[other_robot_id][0],relative_pos[other_robot_id][1],-atan2(y,x)*180.0/3.141592,my_position[2]*180.0/3.141592);
@@ -385,7 +364,7 @@ void process_received_ping_messages(void) {
       myself.speed[emiter_id][1] = 1.0 * (1 / DELTA_T) * (myself.distances[emiter_id][1] - myself.previousDistances[emiter_id][1]);
     }
 
-    //if(myself.ID == 0){
+    /*if(myself.ID == 0){
 			printf("Rec : %d, emm: %d \n", myself.ID, emiter_id);
 			//printf("Directions: %lf, %lf\n", message_direction[0],message_direction[1]);
 			//printf("Message rssi: %lf\n", message_rssi);
@@ -398,7 +377,7 @@ void process_received_ping_messages(void) {
 			//printf("Prev dist Z: %lf\n", myself.previousDistances[emmiter_id][1]);
 			printf("Speed X: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emiter_id][0]-myself.previousDistances[emiter_id][0]));
 			printf("Speed Z: %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emiter_id][1]-myself.previousDistances[emiter_id][1]));
-//}
+    }*/
 
     wb_receiver_next_packet(receiver2);
   }
@@ -481,10 +460,8 @@ int main() {
     limit(&msr, MAX_SPEED);
 
     // Print positions
-    // printf("ID: %d, time %d position_X: %f, position_Z:
-    // %f\n",robot_id,t,my_position[0], my_position[1]); printf("ID: %d, time %d
-    // relative_X: %f, relative_Z: %f, relative_Theta:
-    // %f\n",(robot_id+1)%FLOCK_SIZE,t,relative_pos[(robot_id+1)%FLOCK_SIZE][0],relative_pos[(robot_id+1)%FLOCK_SIZE][1],relative_pos[(robot_id+1)%FLOCK_SIZE][2]);
+    printf("ID: %d, time %d position_X: %f, position_Z:  %f\n",myself.ID,t,myself.my_position[0], myself.my_position[1]);
+    printf("ID: %d, time %d relative_X: %f, relative_Z: %f, relative_Theta:  %f\n",(myself.ID+1)%FLOCK_SIZE,t,myself.distances[(myself.ID+1)%FLOCK_SIZE][0],myself.distances[(myself.ID+1)%FLOCK_SIZE][1],myself.relAngle[(myself.ID+1)%FLOCK_SIZE]);
 
     /*Webots 2018b*/
     // Set speed
@@ -498,5 +475,6 @@ int main() {
 
     // Continue one step
     wb_robot_step(TIME_STEP);
+    t += TIME_STEP;
   }
 }
