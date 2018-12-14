@@ -25,7 +25,7 @@
 /*Webots 2018b*/
 #define MAX_SPEED_WEB 6.28  // Maximum speed webots
 /*Webots 2018b*/
-#define FLOCK_SIZE 1  // Size of flock
+#define FLOCK_SIZE 10  // Size of flock
 #define TIME_STEP 64  // [ms] Length of time step
 
 #define AXLE_LENGTH 0.052  // Distance between wheels of robot (meters)
@@ -34,12 +34,12 @@
 #define DELTA_T 0.064        // Timestep (seconds)
 
 #define RULE1_THRESHOLD  0.05  // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT (0.8 / 10)  // Weight of aggregation rule. default 0.6/10
+#define RULE1_WEIGHT (0.7 / 10)  // Weight of aggregation rule. default 0.6/10
 
 #define RULE2_THRESHOLD  0.15 // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.02 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_WEIGHT (0.6 / 10)  // Weight of dispersion rule. default 0.02/10
 
-#define RULE3_WEIGHT (0.4 / 10)  // Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT (0.55 / 10)  // Weight of consistency rule. default 1.0/10
 
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -68,7 +68,6 @@ int e_puck_matrix[16] = {17,  29,  34,  10, 8, -38, -56, -76, -72, -58, -36, 8, 
 WbDeviceTag ds[NB_SENSORS];  // Handle for the infrared distance sensors
 WbDeviceTag receiver2;       // Handle for the receiver node
 WbDeviceTag emitter2;        // Handle for the emitter node
-WbDeviceTag compass2;
 
 // Unique and normalized (between 0 and FLOCK_SIZE-1) robot ID
 int robot_id_u, robot_id;
@@ -96,7 +95,6 @@ static void reset() {
 
   receiver2 = wb_robot_get_device("receiver2");
   emitter2 = wb_robot_get_device("emitter2");
-  compass2 = wb_robot_get_device("compass2");
 
   /*Webots 2018b*/
   // get motors
@@ -115,7 +113,8 @@ static void reset() {
   }
   robot_name = (char *)wb_robot_get_name();
 
-  for (i = 0; i < NB_SENSORS; i++) wb_distance_sensor_enable(ds[i], 64);
+  for (i = 0; i < NB_SENSORS; i++)
+    wb_distance_sensor_enable(ds[i], 64);
 
   wb_receiver_enable(receiver2, 64);
 
@@ -249,8 +248,9 @@ void reynolds_rules() {
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
     if (robot_id != i) {
-      if(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2) < RULE2_THRESHOLD) {
+      if(sqrt(pow(relative_pos[i][0],2)+pow(relative_pos[i][1],2)) < RULE2_THRESHOLD) {
         for (j=0;j<2;j++) {
+          if(relative_pos[i][j] != 0)
             dispersion[j] -= 1/relative_pos[i][j];
         }
       }
@@ -346,7 +346,7 @@ void process_received_ping_messages(void) {
       relative_speed[other_robot_id][0] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][0]-prev_relative_pos[other_robot_id][0]);
       relative_speed[other_robot_id][1] = 1.0*(1/DELTA_T)*(relative_pos[other_robot_id][1]-prev_relative_pos[other_robot_id][1]);
     }
-
+    
     wb_receiver_next_packet(receiver2);
   }
 }

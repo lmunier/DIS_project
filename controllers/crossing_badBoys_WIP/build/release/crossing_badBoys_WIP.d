@@ -1,4 +1,4 @@
-build/release/obstacle_WIP.o: obstacle_WIP.c \
+build/release/crossing_badBoys_WIP.o: crossing_badBoys_WIP.c \
  /usr/local/webots/include/controller/c/webots/robot.h \
  /usr/local/webots/include/controller/c/webots/types.h \
  /usr/local/webots/include/controller/c/webots/nodes.h \
