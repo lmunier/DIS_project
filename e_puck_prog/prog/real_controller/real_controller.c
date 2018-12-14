@@ -57,8 +57,8 @@ typedef char int8_t;            //127
 
 #define MARGINAL_THRESHOLD 40
 
-#define TIMEOUT 500
-#define SEND_TIME 5
+#define TIMEOUT 100
+#define SEND_TIME 10
 
 /*Adding correction factor*/
 #define K_X	1.0
@@ -89,7 +89,7 @@ char *robot_name;
 int state_robot= RECEIVER;
 
 float theta_robots[FLOCK_SIZE];
-int init_pos = 1;
+int get_initial_position = 1;
 
 #define NB_TASK 2
 uint16_t time_last_msg=0;
@@ -115,7 +115,7 @@ char *robot_name;
 int state_robot=0;
 
 int theta_robots[FLOCK_SIZE];
-int init_pos = 0;
+int get_initial_position = 0;
 int t;*/
 
 int getselector()
@@ -160,8 +160,8 @@ int main()
   {
     bmsl = 0; bmsr = 0; sum_sensors = 0; max_sens = 0;
 
-    sprintf(tmp, "State : %d\n", state_robot);
-		btcomSendString(tmp);
+    // sprintf(tmp, "State : %d\n", state_robot);
+		// btcomSendString(tmp);
 
     /* Braitenberg */
     for (i = 0; i < NB_SENSORS; i++)
@@ -201,7 +201,7 @@ int main()
     prev_my_position[2] = my_position[2];
 
     update_self_motion(msl, msr);
-    wait(TIME_STEP);
+    wait(10);
 
     if(state_robot== RECEIVER)
       process_received_ping_messages();
@@ -296,7 +296,7 @@ void reset(void)
   }
 
   if(robot_id == 0){
-    init_pos = 0;
+    get_initial_position = 0;
     state_robot= EMITTER;
   }
 }
@@ -446,7 +446,7 @@ void reynolds_rules()
 
 void send_ping(void)
 {
-  btcomSendString("Send\n");
+  btcomSendString("J'envoie\n");
   // Reset the timer
   timer_reset = 0;
   while (timer_reset == 0); // Check that the timer has been reset
@@ -462,7 +462,11 @@ void send_ping(void)
   // sprintf(tmp,"time apres 5 msg: %d\n", timer_count);
   // btcomSendString(tmp);
 
-  state_robot= RECEIVER;
+  state_robot = RECEIVER;
+
+  timer_reset = 0;
+  while(timer_reset == 0);
+
   next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
 }
 
@@ -480,8 +484,9 @@ void process_received_ping_messages(void)
 
   while(imsg.error != -1)
   {
-    time_last_msg = timer_count;
-
+    //time_last_msg = timer_count;
+    timer_reset = 0;
+    while(timer_reset == 0);
     // sprintf(tmp,"Entre receiver: %d\n", timer_count);
     // btcomSendString(tmp);
 
@@ -490,19 +495,19 @@ void process_received_ping_messages(void)
     emitter_id = (int)imsg.value;
 
     // sprintf(tmp,"emitter_id: %d\n", emitter_id);
-    // btcomSendString(tmp);
+    btcomSendString("Message bien recu\n");
 
     relative_pos[emitter_id][2] = message_direction;
     relative_pos[emitter_id][2] += my_position[2];  // find the relative theta;
     range = message_rssi;
-    if(init_pos == 1) {
+    if(get_initial_position == 1) {
       my_position[0] = range*cos(relative_pos[emitter_id][2]);
       my_position[1] = -1.0 * range*sin(relative_pos[emitter_id][2]);
       my_position[2] = 0;
       prev_my_position[0] = my_position[0];   // relative x pos
       prev_my_position[1] = my_position[1];   // relative y pos
       prev_my_position[2] = my_position[2];
-      init_pos = 0;
+      get_initial_position = 0;
     } else {
       prev_relative_pos[emitter_id][0] = relative_pos[emitter_id][0];
       prev_relative_pos[emitter_id][1] = relative_pos[emitter_id][1];
@@ -518,10 +523,10 @@ void process_received_ping_messages(void)
   // sprintf(tmp, "time entre 2 msg=%d \n", timer_count);
   // btcomSendString(tmp);
 
-  if(((timer_count-time_last_msg) >= TIMEOUT)){
+  if(timer_count >= TIMEOUT){
     next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
-    sprintf(tmp, "next_emitterID inside=%d \n", next_emitterID);
-    btcomSendString(tmp);
+    // sprintf(tmp, "next_emitterID inside=%d \n", next_emitterID);
+    // btcomSendString(tmp);
 
     if(next_emitterID == robot_id){
       state_robot= EMITTER;
