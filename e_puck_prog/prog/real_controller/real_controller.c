@@ -73,7 +73,6 @@ typedef char int8_t;            //127
 // for obstacle avoidance
 //int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
 int e_puck_matrix[16] = {18,  28,  36,  10, 8,  -36, -58, -72, -72, -58, -36, 8,  10, 36,  28,  18};
-// char value[128];
 // Unique and normalized (between 0 and FLOCK_SIZE-1) robot ID
 int robot_id;
 
@@ -87,18 +86,17 @@ float speed[FLOCK_SIZE][2];  // Speeds calculated with Reynold's rules
 float initialized[FLOCK_SIZE];  // != 0 if initial positions have been received
 float migr[2] = {0, 5};    // Migration vector
 char *robot_name;
-int send = RECEIVER;
+int state_robot= RECEIVER;
 
 float theta_robots[FLOCK_SIZE];
 int init_pos = 1;
 
 #define NB_TASK 2
-uint16_t last_msg_time=0;
+uint16_t time_last_msg=0;
 uint16_t timer_count=0;
 int8_t   timer_reset=0;
 int8_t   timer_done[NB_TASK] = {0,0};
-int nb_send = 0, nb_process = 0, received = 0;
-int nextID=0;
+int next_emitterID=0;
 
 // Nasty arrays in our code
 char tmp[128];
@@ -114,7 +112,7 @@ int speed[FLOCK_SIZE][2];  // Speeds calculated with Reynold's rules
 int initialized[FLOCK_SIZE];  // != 0 if initial positions have been received
 int migr[2] = {0, 5};    // Migration vector
 char *robot_name;
-int send =0;
+int state_robot=0;
 
 int theta_robots[FLOCK_SIZE];
 int init_pos = 0;
@@ -162,7 +160,7 @@ int main()
   {
     bmsl = 0; bmsr = 0; sum_sensors = 0; max_sens = 0;
 
-    sprintf(tmp, "State : %d\n", send);
+    sprintf(tmp, "State : %d\n", state_robot);
 		btcomSendString(tmp);
 
     /* Braitenberg */
@@ -193,8 +191,8 @@ int main()
       bmsl += 200;//66;
       bmsr += 200;//72;
 
-      /* Send and get information */
-    if(send == EMITTER)
+      /* state_robotand get information */
+    if(state_robot== EMITTER)
       send_ping();  // sending a ping to other robot, so they can measure their
 
     /// Compute self position-pedantic
@@ -205,7 +203,7 @@ int main()
     update_self_motion(msl, msr);
     wait(TIME_STEP);
 
-    if(send == RECEIVER)
+    if(state_robot== RECEIVER)
       process_received_ping_messages();
 
     speed[robot_id][0] = (1 / DELTA_T) * (my_position[0] - prev_my_position[0]);
@@ -299,7 +297,7 @@ void reset(void)
 
   if(robot_id == 0){
     init_pos = 0;
-    send = EMITTER;
+    state_robot= EMITTER;
   }
 }
 
@@ -452,8 +450,6 @@ void send_ping(void)
   // Reset the timer
   timer_reset = 0;
   while (timer_reset == 0); // Check that the timer has been reset
-  //uint16_t old_timer = timer_count;
-  //while((timer_count-old_timer)<=TIMEOUT){
   while(timer_count<=TIMEOUT){
 
     // sprintf(tmp,"delta t: %d\n", timer_count);
@@ -461,14 +457,13 @@ void send_ping(void)
 
     ircomSend(robot_id);
     while (ircomSendDone() == 0);
-    //nb_send++;
     wait(SEND_TIME);
   }
   // sprintf(tmp,"time apres 5 msg: %d\n", timer_count);
   // btcomSendString(tmp);
 
-  send = RECEIVER;
-  nextID = (nextID+1)%FLOCK_SIZE;
+  state_robot= RECEIVER;
+  next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
 }
 
 ////////////////////* Processs receive message *////////////////////////////////
@@ -485,7 +480,7 @@ void process_received_ping_messages(void)
 
   while(imsg.error != -1)
   {
-    last_msg_time = timer_count;
+    time_last_msg = timer_count;
 
     // sprintf(tmp,"Entre receiver: %d\n", timer_count);
     // btcomSendString(tmp);
@@ -523,13 +518,13 @@ void process_received_ping_messages(void)
   // sprintf(tmp, "time entre 2 msg=%d \n", timer_count);
   // btcomSendString(tmp);
 
-  if(((timer_count-last_msg_time) >= TIMEOUT)){
-    nextID = (nextID+1)%FLOCK_SIZE;
-    sprintf(tmp, "nextID inside=%d \n", nextID);
+  if(((timer_count-time_last_msg) >= TIMEOUT)){
+    next_emitterID = (next_emitterID+1)%FLOCK_SIZE;
+    sprintf(tmp, "next_emitterID inside=%d \n", next_emitterID);
     btcomSendString(tmp);
 
-    if(nextID == robot_id){
-      send = EMITTER;
+    if(next_emitterID == robot_id){
+      state_robot= EMITTER;
     }
   }
 }
