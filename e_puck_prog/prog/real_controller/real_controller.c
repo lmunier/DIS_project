@@ -58,7 +58,7 @@ typedef char int8_t;            //127
 #define MARGINAL_THRESHOLD 40
 
 #define TIMEOUT 500
-#define SEND_TIME 100
+#define SEND_TIME 5
 
 /*Adding correction factor*/
 #define K_X	1.0
@@ -99,8 +99,6 @@ int8_t   timer_reset=0;
 int8_t   timer_done[NB_TASK] = {0,0};
 int nb_send = 0, nb_process = 0, received = 0;
 int nextID=0;
-int first_msg = 0;
-
 
 // Nasty arrays in our code
 char tmp[128];
@@ -150,6 +148,8 @@ int main()
   int max_sens;
 
   reset();
+
+  wait(TIME_STEP);
 
   ircomStart();
   ircomEnableContinuousListening();
@@ -253,8 +253,8 @@ void silly_timer(void)
     timer_done[0] = 1;
   }
   if(timer_count%100 == 0){
-    sprintf(tmp, "Time %d \n", timer_count);
-    btcomSendString(tmp);
+    // sprintf(tmp, "Time %d \n", timer_count);
+    // btcomSendString(tmp);
   }
 }
 
@@ -452,24 +452,23 @@ void send_ping(void)
   // Reset the timer
   timer_reset = 0;
   while (timer_reset == 0); // Check that the timer has been reset
-
   //uint16_t old_timer = timer_count;
   //while((timer_count-old_timer)<=TIMEOUT){
   while(timer_count<=TIMEOUT){
 
-    sprintf(tmp,"delta t: %d\n", timer_count);
-    btcomSendString(tmp);
+    // sprintf(tmp,"delta t: %d\n", timer_count);
+    // btcomSendString(tmp);
 
     ircomSend(robot_id);
     while (ircomSendDone() == 0);
     //nb_send++;
     wait(SEND_TIME);
   }
-  sprintf(tmp,"time apres 5 msg: %d\n", timer_count);
-  btcomSendString(tmp);
+  // sprintf(tmp,"time apres 5 msg: %d\n", timer_count);
+  // btcomSendString(tmp);
 
   send = RECEIVER;
-  //first_msg = 0;
+  nextID = (nextID+1)%FLOCK_SIZE;
 }
 
 ////////////////////* Processs receive message *////////////////////////////////
@@ -480,27 +479,23 @@ void process_received_ping_messages(void)
   float message_rssi;  // Received Signal Strength indicator
   float range;
   int emitter_id;
-  int emitter_id;
 
   IrcomMessage imsg;
   ircomPopMessage(&imsg);
 
   while(imsg.error != -1)
   {
-    if(first_msg == 0){
-      first_msg = 1;
-    }
     last_msg_time = timer_count;
 
-    sprintf(tmp,"Entre receiver: %d\n", timer_count);
-    btcomSendString(tmp);
+    // sprintf(tmp,"Entre receiver: %d\n", timer_count);
+    // btcomSendString(tmp);
 
     message_direction = (float)imsg.direction;
     message_rssi = (float)imsg.distance;
     emitter_id = (int)imsg.value;
 
-    sprintf(tmp,"emitter_id: %d\n", emitter_id);
-    btcomSendString(tmp);
+    // sprintf(tmp,"emitter_id: %d\n", emitter_id);
+    // btcomSendString(tmp);
 
     relative_pos[emitter_id][2] = message_direction;
     relative_pos[emitter_id][2] += my_position[2];  // find the relative theta;
@@ -525,17 +520,16 @@ void process_received_ping_messages(void)
     ircomPopMessage(&imsg);
   }
 
-  sprintf(tmp, "time entre 2 msg=%ld \n", timer_count-last_msg_time);
-  btcomSendString(tmp);
+  // sprintf(tmp, "time entre 2 msg=%d \n", timer_count);
+  // btcomSendString(tmp);
 
-  if(((timer_count-last_msg_time) >= TIMEOUT) && (first_msg == 1)){
+  if(((timer_count-last_msg_time) >= TIMEOUT)){
     nextID = (nextID+1)%FLOCK_SIZE;
-    first_msg = 0;
-
     sprintf(tmp, "nextID inside=%d \n", nextID);
     btcomSendString(tmp);
-  }
-  if(nextID == robot_id){
-    send = EMITTER;
+
+    if(nextID == robot_id){
+      send = EMITTER;
+    }
   }
 }
