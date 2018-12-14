@@ -31,7 +31,7 @@
 #define PI 3.1415
 
 #define NB_SENSORS 8            // Number of IR sensors
-#define OBSTACLE_THRESHOLD 150  // Value to detect an obstacle
+#define OBSTACLE_THRESHOLD 90  // Value to detect an obstacle
 #define MIN_SENS 300            // Minimum sensibility value
 #define MAX_SENS 4096           // Maximum sensibility value
 #define MAX_SPEED 800           // Maximum speed
@@ -39,16 +39,13 @@
 #define MAX_SPEED_WEB 6.28  // Maximum speed webots
 /*Webots 2018b*/
 
-#define RULE1_THRESHOLD \
-  0.20  // Threshold to activate aggregation rule. default 0.20
+#define RULE1_THRESHOLD 0.20  // Threshold to activate aggregation rule. default 0.20
 #define RULE1_WEIGHT 0.5  // Weight of aggregation rule. default 0.6/10
-#define RULE2_THRESHOLD \
-  0.15  // Threshold to activate dispersion rule. default 0.15
+#define RULE2_THRESHOLD  0.15  // Threshold to activate dispersion rule. default 0.15
 #define RULE2_WEIGHT (0.03 / 10)  // Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT (1.0 / 10)   // Weight of consistency rule. default 1.0/10
 #define MARGINAL_THRESHOLD 40   // Distance to take an e-puck into a group
-#define MIGRATION_WEIGHT \
-  (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
+#define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
 /*Adding correction factor*/
 #define K_X 1.0
@@ -215,7 +212,7 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
     x /= sqrtf(x*x + z*z);
     z /= sqrtf(x*x + z*z);
   }
-  
+
   // Add force which derivate e-puck
   printf("x %f z %f\n", x, z);
   printf("force_x %f force_z %f\n", force_x, force_z);
@@ -307,7 +304,8 @@ void reynolds_rules() {
           RULE2_THRESHOLD) {
         for (j = 0; j < 2; j++) {
           if (myself.distances[i][j] != 0)
-            dispersion[j] -= 1 / myself.distances[i][j];
+            //dispersion[j] -= 1 / myself.distances[i][j];
+            dispersion[j] -= myself.distances[i][j];
         }
       }
     }
@@ -507,8 +505,8 @@ int main() {
     // Compute wheels speed from reynold's speed
     compute_wheel_speeds(&msl, &msr, force_x, force_z);
 
-    limit(&msl, MAX_SPEED-210);
-    limit(&msr, MAX_SPEED-210);
+    limit(&msl, MAX_SPEED);
+    limit(&msr, MAX_SPEED);
 
     // Print positions
     /*printf("ID: %d, time %d position_X: %f, position_Z:  %f\n", myself.ID, t,
@@ -518,7 +516,7 @@ int main() {
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][0],
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][1],
           myself.relAngle[(myself.ID + 1) % FLOCK_SIZE]);*/
-  
+
 
     /*Webots 2018b*/
     // Set speed
