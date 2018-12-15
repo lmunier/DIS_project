@@ -21,6 +21,10 @@
 
 #define ABS(x) ((x >= 0) ? (x) : -(x))
 
+// Variables to print some values if uncommented
+//#define VERBOSE_FORCE
+//#define VERBOSE_SPEED
+
 #define FLOCK_SIZE 10   // Number of robots
 #define TIME_STEP 64   // Step duration time
 #define DELTA_T 0.064  // Timestep (seconds)
@@ -44,17 +48,24 @@
 #define RULE2_THRESHOLD 0.5  // Threshold to activate dispersion rule. default 0.15
 #define RULE2_WEIGHT (0.06 / 10)  // Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT (0.01 / 10)   // Weight of consistency rule. default 1.0/10
-#define MARGINAL_THRESHOLD 40   // Distance to take an e-puck into a group
+#define MARGINAL_THRESHOLD 2   // Distance to take an e-puck into a group
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
 /*Adding correction factor*/
+// 
 #define K_X 1.0
 #define K_Z 1.0
 #define K_TH 1.0
 #define K_U 0.2  // Forward control coefficient
 #define K_W 2  // Rotational control coefficient
+
+// Inertia by keeping a part of the old command
 #define K_OLD 0.2
-int t;
+
+// Factor to tune the obstacle avoidance compared to the reynold's rules
+#define K 80.0
+#define K_F 30.0
+
 // #define FLOCK_BAD_BOYS 5
 // #define FLOCK_GOOD_BOYS 10
 // #define BAD_BOYS 1
@@ -66,9 +77,7 @@ int t;
 WbDeviceTag left_motor;   // Handler for left wheel of the robot
 WbDeviceTag right_motor;  // Handler for the right wheel of the robot
 
-int e_puck_matrix[16] = {
-    17,  29,  34,  10, 8,  -38, -56, -76,
-    -72, -58, -36, 8,  10, 36,  28,  18};  // for obstacle avoidance
+int t;
 
 WbDeviceTag ds[NB_SENSORS];  // Handle for the infrared distance sensors
 WbDeviceTag receiver2;       // Handle for the receiver node
@@ -162,8 +171,7 @@ static void reset() {
   myself.my_position[2] = 0;  // Set initial theta position of myself to 0
   myself.my_previous_position[0] = 0;  // Set previous X position of myself to 0
   myself.my_previous_position[1] = 0;  // Set previous Z position of myself to 0
-  myself.my_previous_position[2] =
-      0;  // Set previous theta position of myself to 0
+  myself.my_previous_position[2] = 0;  // Set previous theta position of myself to 0
 
   if (myself.ID == 0 || myself.ID == 5) {  // || myself.ID == 1)
     myself.send = 1;
@@ -255,35 +263,26 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
   float x = myself.speed[myself.ID][0] * cosf(myself.my_position[2]) + myself.speed[myself.ID][1] * sinf(myself.my_position[2]);
   // Speed Z in robot coordinates from global coordinates
   float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);
-  printf("id %d x %f z %f\n",myself.ID, x, z);
-
-  /*if(x != 0.0 && z != 0.0){
-    x /= sqrtf(x*x + z*z);
-    z /= sqrtf(x*x + z*z);
-  }*/
   
-  // Add force which derivate e-puck
-  printf("x %f z %f\n", x, z);
-  printf("force_x %f force_z %f\n", force_x, force_z);
-
-  //x -= force_x;
-  //z -= force_z;
-  float K = 80;
-  float K_F = 30;
-  float val_x = 0;
-  float val_z = 0;
-
+  #ifdef VERBOSE_FORCE
+    printf("id %d x %f z %f\n",myself.ID, x, z);
+    
+    // Add force which derivate e-puck
+    printf("x %f z %f\n", x, z);
+    printf("force_x %f force_z %f\n", force_x, force_z);
+  #endif
+  
   if(force_x != 0 || force_z != 0 ){
-    val_x = K*x - K_F*force_x;
-    val_z = K*z - K_F*force_z;
+    x = K*x - K_F*force_x;
+    z = K*z - K_F*force_z;
   } else {
-    val_x = 110*x;
-    val_z = 110*z;
+    x = 110*x;
+    z = 110*z;
   }
 
-  x = val_x;
-  z = val_z;
-  printf("x %f z %f\n", x, z);
+  #ifdef VERBOSE_FORCE
+    printf("x %f z %f\n", x, z);
+  #endif
 
   float range = sqrtf(x * x + z * z);  // Norm of the wanted speed vector in robot coordinate
   float bearing = -atan2f(x, z);
@@ -294,12 +293,17 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
   // Convert to wheel speeds (number of steps for each wheels)!
   *msl = (u - AXE_LENGTH * w / 2.0) * (50.0 / WHEEL_RADIUS);
   *msr = (u + AXE_LENGTH * w / 2.0) * (50.0 / WHEEL_RADIUS);
-  printf("msr %d msl %d\n", *msr, *msl);
+  
+  #ifdef VERBOSE_SPEED
+    printf("msr %d msl %d\n", *msr, *msl);
+  #endif
 
   limit(msl, MAX_SPEED);
   limit(msr, MAX_SPEED);
 
-  printf("msr %d msl %d\n", *msr, *msl);
+  #ifdef VERBOSE_SPEED
+    printf("msr %d msl %d\n", *msr, *msl);
+  #endif
 }
 
 /*
@@ -499,9 +503,7 @@ void compute_obstacle(float *value_x, float *value_z){
   float angle_epuck[8] = {1.27, 0.77, 0, 5.21, 4.21, 3.14, 2.37, 1.87};
   int distances[NB_SENSORS] = {0};  // Array for the distance sensor readings
   int i = 0;
-  float sum_angle = 0;
   float force_x = 0.0, force_z = 0.0;
-  float norm = 0.0;
   float mean = 0, sigma = 0.2; 
 
   for(i = 0; i < NB_SENSORS; i++){
