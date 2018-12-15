@@ -5,7 +5,8 @@ real_controller_force.o: real_controller_force.c \
  ../../src/epfl/e_uart_char.h ../../src/epfl/e_led.h \
  ../../src/epfl/e_motors.h ../../src/epfl/e_agenda.h \
  ../../src/std_microchip/include/stdio.h \
- ../../src/std_microchip/include/yvals.h ../../src/ircom/ircom.h \
+ ../../src/std_microchip/include/yvals.h \
+ ../../src/std_microchip/include/stdlib.h ../../src/ircom/ircom.h \
  ../../src/ircom/e_ad_conv.h ../../src/ircom/ircomReceive.h \
  ../../src/ircom/ircomSend.h ../../src/ircom/ircomTools.h \
  ../../src/ircom/ircomMessages.h ../../src/btcom/btcom.h \
