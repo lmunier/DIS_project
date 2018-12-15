@@ -373,17 +373,17 @@ void check_if_out_of_range(){
     if(i==myself.ID)
       continue;
     else{
-      sprintf(tmp,"delta time: %d\n", myTime.timer_count_100ms - is_in_flock[i][0]);
-      btcomSendString(tmp);
+      // sprintf(tmp,"delta time: %d\n", myTime.timer_count_100ms - is_in_flock[i][0]);
+      // btcomSendString(tmp);
       if((myTime.timer_count_100ms - is_in_flock[i][0]) >= TIMEOUT){
         is_in_flock[i][1] = 0;
-        sprintf(tmp,"IS OUT: %d\n", i);
-        btcomSendString(tmp);
+        // sprintf(tmp,"IS OUT: %d\n", i);
+        // btcomSendString(tmp);
       }
       else{
         is_in_flock[i][1] = 1;
-        sprintf(tmp,"IS BACK: %d\n", i);
-        btcomSendString(tmp);
+        // sprintf(tmp,"IS BACK: %d\n", i);
+        // btcomSendString(tmp);
       }
     }
   }
@@ -391,9 +391,8 @@ void check_if_out_of_range(){
 
 ///////////////*Update speed according to Reynold's rules *//////////////////
 
-void reynolds_rules()
-{
-  int i, j;                      // Loop counters
+void reynolds_rules() {
+  int i, j;                         // Loop counters
   float rel_avg_loc[2] = {0, 0};    // Flock average positions
   float rel_avg_speed[2] = {0, 0};  // Flock average speeds
   float cohesion[2] = {0, 0};
@@ -403,19 +402,17 @@ void reynolds_rules()
   int nb_neighbours = 0;
 
   /* Compute averages over the whole flock */
-  for (i = 0; i < FLOCK_SIZE; i++)
-  {
-    if (i != myself.ID)
-    {
+  for (i = 0; i < FLOCK_SIZE; i++) {
+    if (i != myself.ID) {
       dist = sqrtf(myself.distances[i][0] * myself.distances[i][0] +
-                  myself.distances[i][1] * myself.distances[i][1]);
-      if (dist < MARGINAL_THRESHOLD)
-      {
-        for (j = 0; j < 2; j++)
-        {
-          rel_avg_speed[j] += myself.speed[i][j];
-          rel_avg_loc[j] += myself.distances[i][j];
-          nb_neighbours++;
+                   myself.distances[i][1] * myself.distances[i][1]);
+
+      if (dist < MARGINAL_THRESHOLD) {
+        for (j = 0; j < 2; j++) {
+          rel_avg_speed[j] += is_in_flock[i][1]*myself.speed[i][j];
+          rel_avg_loc[j] += is_in_flock[i][1]*myself.distances[i][j];
+          if(is_in_flock[i][1] == 1)
+            nb_neighbours++;
         }
       }
     }
@@ -425,25 +422,27 @@ void reynolds_rules()
   for (j = 0; j < 2; j++) {
     if (nb_neighbours != 0) {
       rel_avg_loc[j] /= (nb_neighbours + 1);
-      rel_avg_speed[j] /= (nb_neighbours + 1);
+      rel_avg_speed[j] /= (nb_neighbours);
     }
   }
 
-
   /* Rule 1 - Aggregation/Cohesion: move towards the center of mass */
+  // If center of mass is too far
   for (j = 0; j < 2; j++) {
-    //If center of mass is too far
-    if(fabs(rel_avg_loc[j]) > RULE1_THRESHOLD) {
-        cohesion[j] = rel_avg_loc[j];
+    if (fabs(rel_avg_loc[j]) > RULE1_THRESHOLD) {
+      cohesion[j] = rel_avg_loc[j];
     }
   }
 
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
-    if (myself.ID != i) {
-      if(pow(myself.distances[i][0],2)+pow(myself.distances[i][1],2) < RULE2_THRESHOLD) {
-        for (j=0;j<2;j++) {
-            dispersion[j] -= myself.distances[i][j];
+    if (i != myself.ID) {
+      if (sqrtf(myself.distances[i][0] * myself.distances[i][0] +
+                myself.distances[i][1] * myself.distances[i][1]) <
+          RULE2_THRESHOLD) {
+        for (j = 0; j < 2; j++) {
+          if (myself.distances[i][j] != 0)
+            dispersion[j] -= is_in_flock[i][1]*myself.distances[i][j];
         }
       }
     }
@@ -459,6 +458,8 @@ void reynolds_rules()
     myself.speed[myself.ID][j] = cohesion[j] * RULE1_WEIGHT;
     myself.speed[myself.ID][j] += dispersion[j] * RULE2_WEIGHT;
     myself.speed[myself.ID][j] += consistency[j] * RULE3_WEIGHT;
+    myself.speed[myself.ID][j] +=
+        (myself.migr[j] - myself.my_position[j]) * MIGRATION_WEIGHT;
   }
   myself.speed[myself.ID][1] *= -1;  // z axis of webots is inverted
 }
