@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <webots/robot.h>
@@ -25,8 +26,7 @@
 #define DELTA_T 0.064  // Timestep (seconds)
 
 #define AXE_LENGTH 0.052  // Distance between wheels of robot (meters)
-#define SPEED_UNIT_RADS \
-  0.00628  // Conversion factor from speed unit to radian per second
+#define SPEED_UNIT_RADS 0.00628  // Conversion factor from speed unit to radian per second
 #define WHEEL_RADIUS 0.0205  // Wheel radius (meters)
 #define PI 3.1415
 
@@ -39,11 +39,11 @@
 #define MAX_SPEED_WEB 6.28  // Maximum speed webots
 /*Webots 2018b*/
 
-#define RULE1_THRESHOLD 0.20  // Threshold to activate aggregation rule. default 0.20
+#define RULE1_THRESHOLD 0.08  // Threshold to activate aggregation rule. default 0.20
 #define RULE1_WEIGHT 0.5  // Weight of aggregation rule. default 0.6/10
-#define RULE2_THRESHOLD  0.15  // Threshold to activate dispersion rule. default 0.15
+#define RULE2_THRESHOLD 0.05  // Threshold to activate dispersion rule. default 0.15
 #define RULE2_WEIGHT (0.03 / 10)  // Weight of dispersion rule. default 0.02/10
-#define RULE3_WEIGHT (1.0 / 10)   // Weight of consistency rule. default 1.0/10
+#define RULE3_WEIGHT (0.01 / 10)   // Weight of consistency rule. default 1.0/10
 #define MARGINAL_THRESHOLD 40   // Distance to take an e-puck into a group
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
@@ -55,9 +55,6 @@
 #define K_W 2  // Rotational control coefficient
 #define K_OLD 0.2
 int t;
-// Define the group of the e-puck were we are
-#define BAD_BOYS  // If we are not a bad boys, we are a good boys
-bool bad_group;
 
 WbDeviceTag left_motor;   // Handler for left wheel of the robot
 WbDeviceTag right_motor;  // Handler for the right wheel of the robot
@@ -90,12 +87,6 @@ struct robot {
  * Reset the robot's devices and get its ID
  */
 static void reset() {
-#ifdef BAD_BOYS
-  bad_group = true;
-#else
-  bad_group = false;
-#endif
-
   char *robot_name;
   wb_robot_init();
 
@@ -199,6 +190,37 @@ void update_self_motion(int msl, int msr) {
 }
 
 /*
+ * Compute random numbers
+ */
+float box_muller(float m, float s)	/* normal random variate generator */
+{				        /* mean m, standard deviation s */
+	float x1, x2, w, y1;
+	static float y2;
+	static int use_last = 0;
+
+	if (use_last)		        /* use value from previous call */
+	{
+		y1 = y2;
+		use_last = 0;
+	}
+	else
+	{
+		do {
+			x1 = 2.0 * (double)rand() / (double)RAND_MAX - 1.0;
+			x2 = 2.0 * (double)rand() / (double)RAND_MAX - 1.0;
+			w = x1 * x1 + x2 * x2;
+		} while ( w >= 1.0 );
+
+		w = sqrt( (-2.0 * log( w ) ) / w );
+		y1 = x1 * w;
+		y2 = x2 * w;
+		use_last = 1;
+	}
+
+	return( m + y1 * s );
+}
+
+/*
  * Computes wheel speed given a certain X,Z speed
  */
 void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
@@ -208,31 +230,33 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
   float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);
   printf("id %d x %f z %f\n",myself.ID, x, z);
 
-  if(x != 0.0 && z != 0.0){
+  /*if(x != 0.0 && z != 0.0){
     x /= sqrtf(x*x + z*z);
     z /= sqrtf(x*x + z*z);
-  }
-
+  }*/
+  
   // Add force which derivate e-puck
   printf("x %f z %f\n", x, z);
   printf("force_x %f force_z %f\n", force_x, force_z);
 
-//  x -= force_x;
-//  z -= force_z;
-  int K = 0.4;
+  //x -= force_x;
+  //z -= force_z;
+  float K = 80;
+  float K_F = 30;
   float val_x = 0;
   float val_z = 0;
 
   if(force_x != 0 || force_z != 0 ){
-    val_x = K*x - (1-K)*force_x;
-    val_z = K*z - (1-K)*force_z;
+    val_x = K*x - K_F*force_x;
+    val_z = K*z - K_F*force_z;
   } else {
-    val_x = x;
-    val_z = z;
+    val_x = 110*x;
+    val_z = 110*z;
   }
 
   x = val_x;
   z = val_z;
+  printf("x %f z %f\n", x, z);
 
   float range = sqrtf(x * x + z * z);  // Norm of the wanted speed vector in robot coordinate
   float bearing = -atan2f(x, z);
@@ -304,7 +328,6 @@ void reynolds_rules() {
           RULE2_THRESHOLD) {
         for (j = 0; j < 2; j++) {
           if (myself.distances[i][j] != 0)
-            //dispersion[j] -= 1 / myself.distances[i][j];
             dispersion[j] -= myself.distances[i][j];
         }
       }
@@ -446,26 +469,20 @@ void compute_obstacle(float *value_x, float *value_z){
   float sum_angle = 0;
   float force_x = 0.0, force_z = 0.0;
   float norm = 0.0;
+  float mean = 0, sigma = 0.2; 
 
   for(i = 0; i < NB_SENSORS; i++){
     distances[i] = wb_distance_sensor_get_value(ds[i]);
 
-    if(distances[i] > OBSTACLE_THRESHOLD && (i < 2 || i > 5)){
-      printf("COUCOU distances %d\n", distances[i]);
-      force_x += cosf(angle_epuck[i])*distances[i]*distances[i] / (NB_SENSORS*MAX_SENS);
-      force_z -= sinf(angle_epuck[i])*distances[i]*distances[i] / (NB_SENSORS*MAX_SENS);
+    if(distances[i] > OBSTACLE_THRESHOLD){
+      distances[i] += MAX_SENS*box_muller(mean, sigma)/2;
+      
+      force_x += cosf(angle_epuck[i])*distances[i] / (NB_SENSORS*MAX_SENS);
+      force_z += sinf(angle_epuck[i])*distances[i] / (NB_SENSORS*MAX_SENS);
     }
   }
-
-  norm = sqrtf(force_x*force_x + force_z*force_z);
-
-  if(norm != 0.0){
-    *value_x = force_x/norm;
-    *value_z = force_z/norm;
-  } else {
-    *value_x = 0.0;
-    *value_z = 0.0;
-  }
+  *value_x = force_x;
+  *value_z = force_z;
 }
 
 // the main function
@@ -516,12 +533,14 @@ int main() {
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][0],
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][1],
           myself.relAngle[(myself.ID + 1) % FLOCK_SIZE]);*/
-
+  
 
     /*Webots 2018b*/
     // Set speed
     msl_w = K_OLD * msl_w + (1-K_OLD)*((float)msl * MAX_SPEED_WEB / 1000);
     msr_w = K_OLD * msr_w + (1-K_OLD)*((float)msr * MAX_SPEED_WEB / 1000);
+    //msl_w = (float)msl * MAX_SPEED_WEB / 1000;
+    //msr_w = (float)msr * MAX_SPEED_WEB / 1000;
 
     wb_motor_set_velocity(left_motor, msl_w);
     wb_motor_set_velocity(right_motor, msr_w);
