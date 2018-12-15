@@ -57,10 +57,7 @@ typedef char int8_t;            //127
 
 #define MARGINAL_THRESHOLD 40
 
-#define SENDING_TIME 100
-#define MESSAGE_INTERVAL_TIME 10
-#define TIME_CHANGE_STATE 1000
-#define TIMEOUT 50
+#define TIMEOUT 50    // Limit time to consider a robot in the flock in 100ms
 
 /*Adding correction factor*/
 #define K_X	1.0
@@ -68,11 +65,6 @@ typedef char int8_t;            //127
 #define K_TH	1.0
 #define K_U 	0.2   // Forward control coefficient
 #define K_W 	1  	  // Rotational control coefficient
-
-#define EMITTER 1
-#define RECEIVER 0
-#define ON 1
-#define OFF 0
 
 // for obstacle avoidance
 //int e_puck_matrix[16] = {17,  29,  34,  10, 8,  -38, -56, -76, -72, -58, -36, 8,  10, 36,  28,  18};
@@ -91,26 +83,24 @@ float speed[FLOCK_SIZE][2];  // Speeds calculated with Reynold's rules
 float initialized[FLOCK_SIZE];  // != 0 if initial positions have been received
 float migr[2] = {0, 5};    // Migration vector
 char *robot_name;
-int state_robot = RECEIVER;
 
-uint16_t is_present[FLOCK_SIZE][2];
+uint16_t is_in_flock[FLOCK_SIZE][2];   //Store if a robot is out of range. first colomn is the time of the last message received, second 0 if out 1 if not.
 
 float theta_robots[FLOCK_SIZE];
-int get_initial_position = 1;
+int get_initial_position = 1;     // Indicate if the robot should get its initial position from robot 0
 
 #define NB_TASK 2
 
+// Structure to get time
 struct time{
-  uint16_t timer_count_ms;
-  uint16_t timer_count_10ms;
-  uint16_t timer_count_100ms;
+  uint16_t timer_count_ms;      // Time in ms
+  uint16_t timer_count_10ms;    // Time in 10ms
+  uint16_t timer_count_100ms;   // Time in 100ms
+  int8_t   timer_reset;
+  int8_t   timer_done[NB_TASK];
 }myTime;
 
-int8_t   timer_reset=0;
-int8_t   timer_done[NB_TASK] = {0,0};
-int next_emitterID=0;
-int nb = 0;
-
+int nb = 0;                               // Variable to not saturate the communication canal
 // Nasty arrays in our code
 char tmp[128];
 
@@ -131,15 +121,10 @@ int theta_robots[FLOCK_SIZE];
 int get_initial_position = 0;
 int t;*/
 
-int getselector()
-{
-  return SELECTOR0 + 2*SELECTOR1 + 4*SELECTOR2 + 8*SELECTOR3;
-}
-
-
 //////////////////* Definition des fonctions *//////////////////////////////////
 
 void reset(void);
+int getselector(void);
 void limit(int *, int);
 void update_self_motion(int, int);
 void compute_wheel_speeds(int *, int *);
@@ -245,13 +230,19 @@ int main()
   return 0;
 
 }
+
+// Return the value of the selector
+int getselector()
+{
+  return SELECTOR0 + 2*SELECTOR1 + 4*SELECTOR2 + 8*SELECTOR3;
+}
 /////////////////////////Implementation des fonctions /////////////////////////
 void silly_timer(void)
 {
-  if(timer_reset == 0)
+  if(myTime.timer_reset == 0)
   {
-    timer_done[0] = 0;
-    timer_reset   = 1;
+    myTime.timer_done[0] = 0;
+    myTime.timer_reset   = 1;
   }
   else
   {
@@ -264,20 +255,20 @@ void silly_timer(void)
       myTime.timer_count_100ms++;
     }
     myTime.timer_count_ms++;
-    timer_done[0] = 1;
+    myTime.timer_done[0] = 1;
   }
 }
 
 void wait_task(void)
 {
-  timer_done[1]=1;
+  myTime.timer_done[1]=1;
 }
 
 void wait(uint16_t ms)
 {
-  timer_done[1] = 0;
+  myTime.timer_done[1] = 0;
   e_activate_agenda(wait_task,10*ms);
-  while(timer_done[1]==0);
+  while(myTime.timer_done[1]==0);
   e_destroy_agenda(wait_task);
   return;
 }
@@ -294,6 +285,9 @@ void reset(void)
   myTime.timer_count_ms=0;
   myTime.timer_count_10ms=0;
   myTime.timer_count_100ms=0;
+  myTime.timer_reset=0;
+  myTime.timer_done[0] = 0;
+  myTime.timer_done[1] = 0;
 
   e_start_agendas_processing();
   e_calibrate_ir();
@@ -302,21 +296,19 @@ void reset(void)
   int i;
   robot_id = getselector();
 
-  sprintf(tmp, "reset_robot_id=%d \n", robot_id);
-  btcomSendString(tmp);
+  // sprintf(tmp, "reset_robot_id=%d \n", robot_id);
+  // btcomSendString(tmp);
 
   for(i=0; i<FLOCK_SIZE; i++)
   {
     my_position[i] = 0;
     prev_my_position[i] = 0;
-    is_present[i][1] = 1;
-    is_present[i][0] = myTime.timer_count_100ms;
+    is_in_flock[i][1] = 1;
+    is_in_flock[i][0] = myTime.timer_count_100ms;
   }
 
-  if(robot_id == 0){
+  if(robot_id == 0)
     get_initial_position = 0;
-    state_robot= EMITTER;
-  }
 }
 
 /////////////*Keep given int number within interval {-limit, limit}*////////
@@ -383,15 +375,15 @@ void check_if_out_of_range(){
     if(i==robot_id)
       continue;
     else{
-      sprintf(tmp,"delta time: %d\n", myTime.timer_count_100ms - is_present[i][0]);
+      sprintf(tmp,"delta time: %d\n", myTime.timer_count_100ms - is_in_flock[i][0]);
       btcomSendString(tmp);
-      if((myTime.timer_count_100ms - is_present[i][0]) >= TIMEOUT){
-        is_present[i][1] = 0;
+      if((myTime.timer_count_100ms - is_in_flock[i][0]) >= TIMEOUT){
+        is_in_flock[i][1] = 0;
         sprintf(tmp,"IS OUT: %d\n", i);
         btcomSendString(tmp);
       }
       else{
-        is_present[i][1] = 1;
+        is_in_flock[i][1] = 1;
         sprintf(tmp,"IS BACK: %d\n", i);
         btcomSendString(tmp);
       }
@@ -513,7 +505,7 @@ void process_received_ping_messages(void)
       continue;
     }
 
-    is_present[emitter_id][0] = myTime.timer_count_100ms;
+    is_in_flock[emitter_id][0] = myTime.timer_count_100ms;
 
     relative_pos[emitter_id][2] = message_direction;
     relative_pos[emitter_id][2] += my_position[2];  // find the relative theta;
