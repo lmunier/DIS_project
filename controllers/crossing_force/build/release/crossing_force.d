@@ -1,4 +1,4 @@
-build/release/obstacle_force_WIP.o: obstacle_force_WIP.c \
+build/release/crossing_force.o: crossing_force.c \
  /home/charles/Documents/webots/include/controller/c/webots/robot.h \
  /home/charles/Documents/webots/include/controller/c/webots/types.h \
  /home/charles/Documents/webots/include/controller/c/webots/nodes.h \

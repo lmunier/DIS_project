@@ -1,5 +1,5 @@
 /*****************************************************************************/
-/* File:         real_controller.c                                               */
+/* File:         real_controller_force.c                                               */
 /* Version:      1.1                                                         */
 /* Date:         12.dec.2018                                                   */
 /* Description:  Reynolds flocking with relative positions	           */

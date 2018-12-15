@@ -1,5 +1,5 @@
 /*****************************************************************************/
-/* File:         obstacle_WIPc */
+/* File:         crossing_force.c */
 /* Version:      1.1                                                         */
 /* Date:         12.dec.2018 */
 /* Description:  Reynolds flocking with relative positions	           */
@@ -21,7 +21,7 @@
 
 #define ABS(x) ((x >= 0) ? (x) : -(x))
 
-#define FLOCK_SIZE 5   // Number of robots
+#define FLOCK_SIZE 10   // Number of robots
 #define TIME_STEP 64   // Step duration time
 #define DELTA_T 0.064  // Timestep (seconds)
 
@@ -39,10 +39,10 @@
 #define MAX_SPEED_WEB 6.28  // Maximum speed webots
 /*Webots 2018b*/
 
-#define RULE1_THRESHOLD 0.08  // Threshold to activate aggregation rule. default 0.20
+#define RULE1_THRESHOLD 0.1  // Threshold to activate aggregation rule. default 0.20
 #define RULE1_WEIGHT 0.5  // Weight of aggregation rule. default 0.6/10
-#define RULE2_THRESHOLD 0.05 // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.03 / 10)  // Weight of dispersion rule. default 0.02/10
+#define RULE2_THRESHOLD 0.5  // Threshold to activate dispersion rule. default 0.15
+#define RULE2_WEIGHT (0.06 / 10)  // Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT (0.01 / 10)   // Weight of consistency rule. default 1.0/10
 #define MARGINAL_THRESHOLD 40   // Distance to take an e-puck into a group
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
@@ -55,6 +55,13 @@
 #define K_W 2  // Rotational control coefficient
 #define K_OLD 0.2
 int t;
+// #define FLOCK_BAD_BOYS 5
+// #define FLOCK_GOOD_BOYS 10
+// #define BAD_BOYS 1
+// #define GOOD_BOYS 0
+// Define the group of the e-puck were we are
+// #define BAD_BOYS // If we are not a bad boys, we are a good boys
+// bool bad_group;
 
 WbDeviceTag left_motor;   // Handler for left wheel of the robot
 WbDeviceTag right_motor;  // Handler for the right wheel of the robot
@@ -81,12 +88,20 @@ struct robot {
   float my_previous_position[3];  // Initial position of myself: X, Z and theta
   float migr[2];                  // Position for the migratory urge
   int send;
+  int flock_ID[FLOCK_SIZE];
 } myself;
 
 /*
  * Reset the robot's devices and get its ID
  */
 static void reset() {
+
+  // #ifdef BAD_BOYS
+    // bad_group = true;
+  // #else
+    // bad_group = false;
+  // #endif
+
   char *robot_name;
   wb_robot_init();
 
@@ -121,6 +136,11 @@ static void reset() {
   // read robot id from the robot's name
   sscanf(robot_name, "epuck%d", &(myself.ID));
   myself.ID %= FLOCK_SIZE;  // normalize between 0 and FLOCK_SIZE-1
+  
+  // for(i=0; i<FLOCK_BAD_BOYS; i++)
+      // my_group = BAD_BOYS;
+  // for(i=FLOCK_BAD_BOYS; i<FLOCK_GOOD_BOYS; i++)
+      // my group = GOOD_BOYS;
 
   for (i = 0; i < FLOCK_SIZE; i++) {
     myself.distances[i][0] = 0;          // Initialize distance tab X
@@ -130,6 +150,11 @@ static void reset() {
     myself.relAngle[i] = 0;              // Initialize relative angle tab
     myself.speed[i][0] = 0;              // Initialize speed tab X
     myself.speed[i][1] = 0;              // Initialize speed tab Z
+    
+    if(i/(FLOCK_SIZE/2) ==0)
+      myself.flock_ID[i] = 0;
+    else
+      myself.flock_ID[i] = 1;
   }
 
   myself.my_position[0] = 0;  // Set initial X position of myself to 0
@@ -140,18 +165,20 @@ static void reset() {
   myself.my_previous_position[2] =
       0;  // Set previous theta position of myself to 0
 
-  if (myself.ID == 0) {  // || myself.ID == 1)
+  if (myself.ID == 0 || myself.ID == 5) {  // || myself.ID == 1)
     myself.send = 1;
     myself.init = 0;
   } else {
     myself.send = 0;
     myself.init = 1;
   }
+  
 
-  myself.migr[0] = 0;  // Set the X migratory urge
-  myself.migr[1] = -5;  // Set the Z migratory urge
+    myself.migr[0] = 0;  // Set the X migratory urge
+    myself.migr[1] = -5;  // Set the Z migratory urge
 
-  printf("Reset: robot %d\n", myself.ID);
+    printf("Reset: robot %d\n", myself.ID);
+  
 }
 
 /*
@@ -290,7 +317,7 @@ void reynolds_rules() {
 
   /* Compute averages over the whole flock */
   for (i = 0; i < FLOCK_SIZE; i++) {
-    if (i != myself.ID) {
+    if (i != myself.ID && myself.flock_ID[i] == myself.flock_ID[myself.ID]) {
       dist = sqrtf(myself.distances[i][0] * myself.distances[i][0] +
                    myself.distances[i][1] * myself.distances[i][1]);
 
@@ -322,7 +349,7 @@ void reynolds_rules() {
 
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
-    if (i != myself.ID) {
+    if (i != myself.ID && myself.flock_ID[i] == myself.flock_ID[myself.ID]) {
       if (sqrtf(myself.distances[i][0] * myself.distances[i][0] +
                 myself.distances[i][1] * myself.distances[i][1]) <
           RULE2_THRESHOLD) {
@@ -385,7 +412,13 @@ void process_received_ping_messages(void) {
     // since the name of the sender is in the received message.
     // Note: this does not work for robots having id bigger than 9!
     emiter_id = (int)(inbuffer[0] - '0');
-    nextID = (emiter_id + 1) % FLOCK_SIZE;
+    if(myself.flock_ID[myself.ID] != myself.flock_ID[emiter_id]){
+    
+      wb_receiver_next_packet(receiver2);
+      continue;
+    }
+    nextID = (emiter_id + 1) % (FLOCK_SIZE/2) + myself.flock_ID[myself.ID]*3;
+    
 
     if (nextID == myself.ID) {
       myself.send = 1;
@@ -393,7 +426,7 @@ void process_received_ping_messages(void) {
 
     myself.relAngle[emiter_id] = -atan2f(z, x);
     myself.relAngle[emiter_id] +=
-        myself.my_position[2];  // Find the absolute theta
+    myself.my_position[2];  // Find the absolute theta
     range = sqrtf((1 / message_rssi));
     // printf("ID: %d, REC: %d, Y: %lf, X: %lf, ANGLe: %lf, OTHER: %lf\n
     // ",robot_id, other_robot_id, message_direction[2], message_direction[0],
