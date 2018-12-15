@@ -33,7 +33,7 @@
 #define NB_SENSORS 8            // Number of IR sensors
 #define OBSTACLE_THRESHOLD 90  // Value to detect an obstacle
 #define MIN_SENS 300            // Minimum sensibility value
-#define MAX_SENS 4096           // Maximum sensibility value
+#define MAX_SENS 4095           // Maximum sensibility value
 #define MAX_SPEED 800           // Maximum speed
 /*Webots 2018b*/
 #define MAX_SPEED_WEB 6.28  // Maximum speed webots
@@ -132,13 +132,10 @@ static void reset() {
     myself.speed[i][1] = 0;              // Initialize speed tab Z
   }
 
-  myself.my_position[0] = 0;  // Set initial X position of myself to 0
-  myself.my_position[1] = 0;  // Set initial Z position of myself to 0
-  myself.my_position[2] = 0;  // Set initial theta position of myself to 0
-  myself.my_previous_position[0] = 0;  // Set previous X position of myself to 0
-  myself.my_previous_position[1] = 0;  // Set previous Z position of myself to 0
-  myself.my_previous_position[2] =
-      0;  // Set previous theta position of myself to 0
+  for(i=0;i<3;i++){
+    myself.my_position[i] = 0;
+    myself.my_previous_position[i] = 0;
+  }
 
   if (myself.ID == 0) {  // || myself.ID == 1)
     myself.send = 1;
@@ -234,7 +231,7 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
     x /= sqrtf(x*x + z*z);
     z /= sqrtf(x*x + z*z);
   }*/
-  
+
   // Add force which derivate e-puck
   printf("x %f z %f\n", x, z);
   printf("force_x %f force_z %f\n", force_x, force_z);
@@ -372,7 +369,7 @@ void process_received_ping_messages(void) {
   double message_rssi = 0.0;  // Received Signal Strength indicator
   double range = 0.0;
   char *inbuffer;  // Buffer for the receiver node
-  int emiter_id = 0, nextID = 0;
+  int emitter_id = 0, nextID = 0;
 
   while (wb_receiver_get_queue_length(receiver2) > 0) {
     inbuffer = (char *)wb_receiver_get_data(receiver2);
@@ -384,15 +381,15 @@ void process_received_ping_messages(void) {
 
     // since the name of the sender is in the received message.
     // Note: this does not work for robots having id bigger than 9!
-    emiter_id = (int)(inbuffer[0] - '0');
-    nextID = (emiter_id + 1) % FLOCK_SIZE;
+    emitter_id = (int)(inbuffer[0] - '0');
+    nextID = (emitter_id + 1) % FLOCK_SIZE;
 
     if (nextID == myself.ID) {
       myself.send = 1;
     }
 
-    myself.relAngle[emiter_id] = -atan2f(z, x);
-    myself.relAngle[emiter_id] +=
+    myself.relAngle[emitter_id] = -atan2f(z, x);
+    myself.relAngle[emitter_id] +=
         myself.my_position[2];  // Find the absolute theta
     range = sqrtf((1 / message_rssi));
     // printf("ID: %d, REC: %d, Y: %lf, X: %lf, ANGLe: %lf, OTHER: %lf\n
@@ -400,8 +397,8 @@ void process_received_ping_messages(void) {
     // theta, message_direction[1]);
 
     if (myself.init == 1) {
-      myself.my_position[0] = range * cosf(myself.relAngle[emiter_id]);
-      myself.my_position[1] = -1.0 * range * sinf(myself.relAngle[emiter_id]);
+      myself.my_position[0] = range * cosf(myself.relAngle[emitter_id]);
+      myself.my_position[1] = -1.0 * range * sinf(myself.relAngle[emitter_id]);
       myself.my_position[2] = 0;
 
       // printf("ID: %d, X: %lf, Z: %lf, Theta: %lf\n", robot_id,
@@ -417,26 +414,26 @@ void process_received_ping_messages(void) {
       // theta += dtheta_g[other_robot_id];
       // theta_robots[other_robot_id] = 0.8*theta_robots[other_robot_id] +
       // 0.2*theta;
-      myself.previousDistances[emiter_id][0] = myself.distances[emiter_id][0];
-      myself.previousDistances[emiter_id][1] = myself.distances[emiter_id][1];
+      myself.previousDistances[emitter_id][0] = myself.distances[emitter_id][0];
+      myself.previousDistances[emitter_id][1] = myself.distances[emitter_id][1];
 
-      myself.distances[emiter_id][0] = range * cosf(myself.relAngle[emiter_id]);  // relative x pos
-      myself.distances[emiter_id][1] =
-          -1.0 * range * sinf(myself.relAngle[emiter_id]);  // relative y pos
+      myself.distances[emitter_id][0] = range * cosf(myself.relAngle[emitter_id]);  // relative x pos
+      myself.distances[emitter_id][1] =
+          -1.0 * range * sinf(myself.relAngle[emitter_id]);  // relative y pos
 
       // printf("Robot %s, from robot %d, x: %g, y: %g, theta %g, my theta
       // %g\n",robot_name,other_robot_id,relative_pos[other_robot_id][0],relative_pos[other_robot_id][1],-atan2(y,x)*180.0/3.141592,my_position[2]*180.0/3.141592);
 
-      myself.speed[emiter_id][0] = 1.0 * (1 / DELTA_T) *
-                                   (myself.distances[emiter_id][0] -
-                                    myself.previousDistances[emiter_id][0]);
-      myself.speed[emiter_id][1] = 1.0 * (1 / DELTA_T) *
-                                   (myself.distances[emiter_id][1] -
-                                    myself.previousDistances[emiter_id][1]);
+      myself.speed[emitter_id][0] = 1.0 * (1 / DELTA_T) *
+                                   (myself.distances[emitter_id][0] -
+                                    myself.previousDistances[emitter_id][0]);
+      myself.speed[emitter_id][1] = 1.0 * (1 / DELTA_T) *
+                                   (myself.distances[emitter_id][1] -
+                                    myself.previousDistances[emitter_id][1]);
     }
 
     /*if(myself.ID == 0){
-                        printf("Rec : %d, emm: %d \n", myself.ID, emiter_id);
+                        printf("Rec : %d, emm: %d \n", myself.ID, emitter_id);
                         //printf("Directions: %lf, %lf\n",
     message_direction[0],message_direction[1]);
                         //printf("Message rssi: %lf\n", message_rssi);
@@ -450,9 +447,9 @@ void process_received_ping_messages(void) {
     myself.previousDistances[emmiter_id][0]);
                         //printf("Prev dist Z: %lf\n",
     myself.previousDistances[emmiter_id][1]); printf("Speed X:
-    %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emiter_id][0]-myself.previousDistances[emiter_id][0]));
+    %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emitter_id][0]-myself.previousDistances[emitter_id][0]));
                         printf("Speed Z:
-    %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emiter_id][1]-myself.previousDistances[emiter_id][1]));
+    %lf\n", 1.0*(1.0/DELTA_T)*(myself.distances[emitter_id][1]-myself.previousDistances[emitter_id][1]));
     }*/
 
     wb_receiver_next_packet(receiver2);
@@ -469,14 +466,14 @@ void compute_obstacle(float *value_x, float *value_z){
   float sum_angle = 0;
   float force_x = 0.0, force_z = 0.0;
   float norm = 0.0;
-  float mean = 0, sigma = 0.2; 
+  float mean = 0, sigma = 0.2;
 
   for(i = 0; i < NB_SENSORS; i++){
     distances[i] = wb_distance_sensor_get_value(ds[i]);
 
     if(distances[i] > OBSTACLE_THRESHOLD){
       distances[i] += MAX_SENS*box_muller(mean, sigma)/2;
-      
+
       force_x += cosf(angle_epuck[i])*distances[i] / (NB_SENSORS*MAX_SENS);
       force_z += sinf(angle_epuck[i])*distances[i] / (NB_SENSORS*MAX_SENS);
     }
@@ -533,7 +530,7 @@ int main() {
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][0],
           myself.distances[(myself.ID + 1) % FLOCK_SIZE][1],
           myself.relAngle[(myself.ID + 1) % FLOCK_SIZE]);*/
-  
+
 
     /*Webots 2018b*/
     // Set speed
