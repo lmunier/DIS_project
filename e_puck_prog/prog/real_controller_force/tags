@@ -19,7 +19,7 @@ MARGINAL_THRESHOLD	real_controller_force.c	56;"	d	file:
 MAX_SENS	real_controller_force.c	46;"	d	file:
 MAX_SPEED	real_controller_force.c	47;"	d	file:
 MIGRATION_WEIGHT	real_controller_force.c	57;"	d	file:
-MIGRATORY_TARGET_X	real_controller_force.c	59;"	d	file:
+MIGRATORY_TARGET_Z	real_controller_force.c	59;"	d	file:
 MIGRATORY_URGE	real_controller_force.c	58;"	d	file:
 MIN_SENS	real_controller_force.c	45;"	d	file:
 NB_SENSORS	real_controller_force.c	43;"	d	file:

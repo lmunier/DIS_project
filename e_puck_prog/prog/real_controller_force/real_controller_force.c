@@ -56,7 +56,7 @@ typedef char int8_t;            //127
 #define MARGINAL_THRESHOLD 40
 #define MIGRATION_WEIGHT (0.3 / 10)    // Wheight of attraction towards the common goal. default 0.01/10
 #define MIGRATORY_URGE 1                // Tells the robots if they should just go forward or move towards a specific myself.migratory direction
-#define MIGRATORY_TARGET_X 0.15
+#define MIGRATORY_TARGET_Z 0.15
 
 #define TIMEOUT 50    // Limit time to consider a robot in the flock in 100ms
 #define NB_TASK 2
@@ -124,7 +124,7 @@ int main()
 
   reset();
 
-  wait(TIME_STEP);
+  wait(2000);
 
   ircomStart();
   ircomEnableContinuousListening();
@@ -169,8 +169,8 @@ int main()
     limit(&msl, MAX_SPEED);
     limit(&msr, MAX_SPEED);
 
-    e_set_speed_left(msl);
-    e_set_speed_right(msr);
+    e_set_speed_left(100);
+    e_set_speed_right(-100);
 
     nb++;
     wait(TIME_STEP);
@@ -250,13 +250,16 @@ void reset(void)
     is_in_flock[i][1] = 1;               // Initialized the robot as "in flock"
   }
 
-  for(i=0;i<3;i++){
+  for(i=0;i<2;i++){
     myself.my_position[i] = 0;
     myself.my_previous_position[i] = 0;
   }
 
-  myself.migr[0] = (myself.my_position[0]-MIGRATORY_TARGET_X);
-  myself.migr[1] = 0;
+  myself.my_position[2] = PI/2;
+  myself.my_previous_position[2] = PI/2;
+
+  myself.migr[0] = 30;//(myself.my_position[0]-MIGRATORY_TARGET_X);
+  myself.migr[1] = 15;//(myself.my_position[1]-MIGRATORY_TARGET_Z);//0;
 
   if(myself.ID == 0)
     myself.get_initial_position = 0;
@@ -301,24 +304,26 @@ void compute_obstacle(float *value_x, float *value_z){
 
 void update_self_motion(int msl, int msr)
 {
-  int nb_step_left, nb_step_right;
+  float dist_left, dist_right;
   float dx, dz, dtheta;
   float R;
   float convert_steps_to_meter;
-  nb_step_left = e_get_steps_left();
+  dist_left = e_get_steps_left()*2.0*PI*WHEEL_RADIUS/1000.0;
   e_set_steps_left(0);
-  nb_step_right = e_get_steps_right();
+  dist_right = e_get_steps_right()*2.0*PI*WHEEL_RADIUS/1000.0;
   e_set_steps_right(0);
 
-  convert_steps_to_meter = (nb_step_left-nb_step_right)*2*PI*WHEEL_RADIUS/1000.0;
-  dtheta = convert_steps_to_meter/AXE_LENGTH;
-  if(abs(dtheta) >= 0.1){
-    R = (nb_step_left+nb_step_right)/(2.0*dtheta);
-    dx = R*(1-cos(dtheta));
-    dz = R*sin(dtheta);
+  // convert_steps_to_meter = (nb_step_left-nb_step_right)*2*PI*WHEEL_RADIUS/1000.0;
+  // dtheta = convert_steps_to_meter/AXE_LENGTH;
+
+  dtheta = (dist_left-dist_right)/AXE_LENGTH;
+  if(dtheta != 0){
+    R = (dist_left+dist_right)/(2.0*dtheta);
+    dx = R*sin(dtheta);//R*(1-cos(dtheta));
+    dz = R*(1-cos(dtheta));//R*sin(dtheta);
   }else{
-    dx = nb_step_left*2*PI*WHEEL_RADIUS/1000.0;
-    dz = 0;
+    dx = 0;
+    dz = dist_left;
   }
 
   myself.my_previous_position[0] = myself.my_position[0];
@@ -326,7 +331,16 @@ void update_self_motion(int msl, int msr)
   myself.my_previous_position[2] = myself.my_position[2];
   myself.my_position[0] += dx;
   myself.my_position[1] += dz;
-  myself.my_position[2] += dtheta;
+  myself.my_position[2] -= dtheta;
+
+  sprintf(tmp, "X:=%lf, Z=%lf, Theta=%lf\n", (double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
+  btcomSendString(tmp);
+
+  if(myself.my_position[2] >= 2*PI){
+    e_set_speed_left(0);
+    e_set_speed_right(0);
+    while(1);
+  }
 
   // float theta = myself.my_position[2];
   //
@@ -346,17 +360,17 @@ void update_self_motion(int msl, int msr)
   // myself.my_position[2] += K_TH * dtheta;
 
   // Keep orientation within 0, 2pi
-  if (myself.my_position[2] > 2 * PI) myself.my_position[2] -= 2.0 * PI;
-  if (myself.my_position[2] < 0) myself.my_position[2] += 2.0 * PI;
+  if (myself.my_position[2] > PI) myself.my_position[2] -= 2.0 * PI;
+  if (myself.my_position[2] < -PI) myself.my_position[2] += 2.0 * PI;
 
   // sprintf(tmp, "X:=%lf, Z=%lf, Theta=%lf\n", (double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
   // btcomSendString(tmp);
 
-  myself.migr[0] = (myself.my_position[0]-MIGRATORY_TARGET_X);
-  myself.migr[1] = 0;
+  myself.migr[0] = 30;
+  myself.migr[1] = 15;//(myself.my_position[1]-MIGRATORY_TARGET_Z);//0;
 
-  sprintf(tmp, "X:=%lf\n", (double)myself.migr[0]);
-  btcomSendString(tmp);
+  // sprintf(tmp, "X:=%lf\n", (double)myself.migr[0]);
+  // btcomSendString(tmp);
 
 
 }
@@ -519,7 +533,7 @@ void reynolds_rules() {
     myself.speed[myself.ID][j] = cohesion[j] * RULE1_WEIGHT;
     myself.speed[myself.ID][j] += dispersion[j] * RULE2_WEIGHT;
     myself.speed[myself.ID][j] += consistency[j] * RULE3_WEIGHT;
-    myself.speed[myself.ID][j] += (myself.migr[j] - myself.my_position[j]) * MIGRATION_WEIGHT;
+    myself.speed[myself.ID][j] += myself.migr[j] * MIGRATION_WEIGHT;//- myself.my_position[j]) * MIGRATION_WEIGHT;
   }
   myself.speed[myself.ID][1] *= -1;  // z axis of webots is inverted
 }
@@ -548,8 +562,13 @@ void process_received_ping_messages(void)
   {
     message_direction = (double)imsg.direction;
 
-    if(message_direction > PI)
-      message_direction = message_direction-2*PI;
+    // if(message_direction > PI)
+    //   message_direction = message_direction-2*PI;
+
+    if(message_direction > PI/2)
+      message_direction = (message_direction + PI/2.0) - 2.0*PI;
+    else
+      message_direction = PI/2 + message_direction;
 
     distance = (double)imsg.distance/100.0;
     emitter_id = (int)imsg.value;
@@ -562,30 +581,30 @@ void process_received_ping_messages(void)
     // sprintf(tmp, "Emitter id=%d, Distance=%lf, Direction=%lf\n", emitter_id,distance,message_direction);
     // btcomSendString(tmp);
 
-    // sprintf(tmp, "Queue=%d\n", emitter_id,distance,message_direction);
+    // sprintf(tmp, "Emitter=%d, Angle=%lf\n", emitter_id,(double)message_direction);
     // btcomSendString(tmp);
 
     deltaT = (myTime.timer_count_100ms-is_in_flock[emitter_id][0])/10.0;
     is_in_flock[emitter_id][0] = myTime.timer_count_100ms;
 
     myself.distances[emitter_id][2] = message_direction;
-    //myself.distances[emitter_id][2] += myself.my_position[2];  // find the relative theta;
+    myself.distances[emitter_id][2] += myself.my_position[2];  // find the relative theta;
 
     if(myself.get_initial_position == 1) {
-      myself.my_position[0] = -1.0 * distance*sin(myself.distances[emitter_id][2]);
-      myself.my_position[1] = distance*cos(myself.distances[emitter_id][2]);
+      myself.my_position[0] = 1.0 * distance*cos(myself.distances[emitter_id][2]);
+      myself.my_position[1] = -1.0 * distance*sin(myself.distances[emitter_id][2]);
       myself.my_previous_position[0] = myself.my_position[0];   // relative x pos
       myself.my_previous_position[1] = myself.my_position[1];   // relative y pos
       myself.my_previous_position[2] = myself.my_position[2];
       myself.get_initial_position = 0;
-      // sprintf(tmp, "Emitter id=%d, Distance X=%lf, Distance Y=%lf, Angle=%lf\n", emitter_id,(double)myself.my_position[0],(double)myself.my_position[1]);
-      // btcomSendString(tmp);
+      sprintf(tmp, "Emitter id=%d, Distance X=%lf, Distance Y=%lf, Angle=%lf\n", emitter_id,(double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
+      btcomSendString(tmp);
     } else {
       myself.previousDistances[emitter_id][0] = myself.distances[emitter_id][0];
       myself.previousDistances[emitter_id][1] = myself.distances[emitter_id][1];
       myself.previousDistances[emitter_id][2] = myself.distances[emitter_id][2];
-      myself.distances[emitter_id][0] = -1.0 * distance*sin(myself.distances[emitter_id][2]);  // relative x pos
-      myself.distances[emitter_id][1] = distance*cos(myself.distances[emitter_id][2]);   // relative y pos
+      myself.distances[emitter_id][0] = 1.0 * distance*cos(myself.distances[emitter_id][2]);  // relative x pos
+      myself.distances[emitter_id][1] = -1.0 * distance*sin(myself.distances[emitter_id][2]);   // relative y pos
       myself.speed[emitter_id][0] = 1.0*(1/deltaT)*(myself.distances[emitter_id][0]-myself.previousDistances[emitter_id][0]);
       myself.speed[emitter_id][1] = 1.0*(1/deltaT)*(myself.distances[emitter_id][1]-myself.previousDistances[emitter_id][1]);
     }

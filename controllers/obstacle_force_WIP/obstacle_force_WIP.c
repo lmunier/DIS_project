@@ -378,6 +378,8 @@ void process_received_ping_messages(void) {
 
     double z = message_direction[2];
     double x = message_direction[1];
+    
+    
 
     // since the name of the sender is in the received message.
     // Note: this does not work for robots having id bigger than 9!
@@ -389,6 +391,7 @@ void process_received_ping_messages(void) {
     }
 
     myself.relAngle[emitter_id] = -atan2f(z, x);
+    printf("aaaaaaaaaaaaaaaaaaaaaaaaa   X=%lf, Z=%lf, THETA=%lf\n", x, z, myself.relAngle[emitter_id]);
     //myself.relAngle[emitter_id] += myself.my_position[2];  // Find the absolute theta
     range = sqrtf((1 / message_rssi));
     // printf("ID: %d, REC: %d, Y: %lf, X: %lf, ANGLe: %lf, OTHER: %lf\n
@@ -495,7 +498,8 @@ int main() {
   // Forever
   while (true) {
     /* Send and get information */
-    send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
+    if(myself.ID == 1)
+      send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
     // Compute self position
     myself.my_previous_position[0] = myself.my_position[0];
@@ -503,8 +507,8 @@ int main() {
     myself.my_previous_position[2] = myself.my_position[2];
 
     update_self_motion(msl, msr);
-
-    process_received_ping_messages();
+    if(myself.ID == 0)
+      process_received_ping_messages();
 
     myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);
     myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);
@@ -538,8 +542,8 @@ int main() {
     //msl_w = (float)msl * MAX_SPEED_WEB / 1000;
     //msr_w = (float)msr * MAX_SPEED_WEB / 1000;
 
-    wb_motor_set_velocity(left_motor, msl_w);
-    wb_motor_set_velocity(right_motor, msr_w);
+    wb_motor_set_velocity(left_motor, 0);
+    wb_motor_set_velocity(right_motor, 0);
     // wb_differential_wheels_set_speed(msl,msr);
     /*Webots 2018b*/
 
