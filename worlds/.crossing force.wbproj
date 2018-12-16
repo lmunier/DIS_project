@@ -9,16 +9,16 @@ selectionDisabled: 0
 viewpointLocked: 0
 orthographicViewHeight: 1
 textFiles: 0 "controllers/super_crossing/super_crossing.c" "controllers/crossing_force/crossing_force.c"
-renderingDevicePerspectives: epuck1:camera;1;0.820513;0;0
-renderingDevicePerspectives: epuck9:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck0:camera;1;0.820513;0;0
-renderingDevicePerspectives: epuck8:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck2:camera;1;0.820513;0;0
-renderingDevicePerspectives: epuck7:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck4:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck5:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck6:camera;1;0.820513;0;0
+renderingDevicePerspectives: epuck9:camera;1;0.820513;0;0
+renderingDevicePerspectives: epuck1:camera;1;0.820513;0;0
+renderingDevicePerspectives: epuck7:camera;1;0.820513;0;0
 renderingDevicePerspectives: epuck3:camera;1;0.820513;0;0
+renderingDevicePerspectives: epuck8:camera;1;0.820513;0;0
 x3dExport-frustumCulling: true
 x3dExport-shadowCascades: 0
 x3dExport-shadowFilterSize: 0
