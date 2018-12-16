@@ -54,9 +54,9 @@ typedef char int8_t;            //127
 #define RULE2_WEIGHT (0.3 / 10)         // Weight of dispersion rule. default 0.02/10
 #define RULE3_WEIGHT (0.01 / 10)        // Weight of consistency rule. default 1.0/10
 #define MARGINAL_THRESHOLD 40
-#define MIGRATION_WEIGHT (0.03 / 10)    // Wheight of attraction towards the common goal. default 0.01/10
+#define MIGRATION_WEIGHT (0.3 / 10)    // Wheight of attraction towards the common goal. default 0.01/10
 #define MIGRATORY_URGE 1                // Tells the robots if they should just go forward or move towards a specific myself.migratory direction
-#define MIGRATORY_TARGET_X 15
+#define MIGRATORY_TARGET_X 0.15
 
 #define TIMEOUT 50    // Limit time to consider a robot in the flock in 100ms
 #define NB_TASK 2
@@ -255,6 +255,9 @@ void reset(void)
     myself.my_previous_position[i] = 0;
   }
 
+  myself.migr[0] = (myself.my_position[0]-MIGRATORY_TARGET_X);
+  myself.migr[1] = 0;
+
   if(myself.ID == 0)
     myself.get_initial_position = 0;
   else
@@ -298,29 +301,64 @@ void compute_obstacle(float *value_x, float *value_z){
 
 void update_self_motion(int msl, int msr)
 {
-  float theta = myself.my_position[2];
+  int nb_step_left, nb_step_right;
+  float dx, dz, dtheta;
+  float R;
+  float convert_steps_to_meter;
+  nb_step_left = e_get_steps_left();
+  e_set_steps_left(0);
+  nb_step_right = e_get_steps_right();
+  e_set_steps_right(0);
 
-  // Compute deltas of the robot
-  float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
-  float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
-  float du = (dr + dl) / 2.0;
-  float dtheta = (dr - dl) / (AXE_LENGTH);
+  convert_steps_to_meter = (nb_step_left-nb_step_right)*2*PI*WHEEL_RADIUS/1000.0;
+  dtheta = convert_steps_to_meter/AXE_LENGTH;
+  if(abs(dtheta) >= 0.1){
+    R = (nb_step_left+nb_step_right)/(2.0*dtheta);
+    dx = R*(1-cos(dtheta));
+    dz = R*sin(dtheta);
+  }else{
+    dx = nb_step_left*2*PI*WHEEL_RADIUS/1000.0;
+    dz = 0;
+  }
 
-  // Compute deltas in the environment
-  float dx = -du * sinf(theta);
-  float dz = -du * cosf(theta);
+  myself.my_previous_position[0] = myself.my_position[0];
+  myself.my_previous_position[1] = myself.my_position[1];
+  myself.my_previous_position[2] = myself.my_position[2];
+  myself.my_position[0] += dx;
+  myself.my_position[1] += dz;
+  myself.my_position[2] += dtheta;
 
-  // Update position
-  myself.my_position[0] += K_X  * dx;
-  myself.my_position[1] += K_Y  * dz;
-  myself.my_position[2] += K_TH * dtheta;
+  // float theta = myself.my_position[2];
+  //
+  // // Compute deltas of the robot
+  // float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
+  // float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
+  // float du = (dr + dl) / 2.0;
+  // float dtheta = (dr - dl) / (AXE_LENGTH);
+  //
+  // // Compute deltas in the environment
+  // float dx = -du * sinf(theta);
+  // float dz = -du * cosf(theta);
+  //
+  // // Update position
+  // myself.my_position[0] += K_X  * dx;
+  // myself.my_position[1] += K_Y  * dz;
+  // myself.my_position[2] += K_TH * dtheta;
 
   // Keep orientation within 0, 2pi
   if (myself.my_position[2] > 2 * PI) myself.my_position[2] -= 2.0 * PI;
   if (myself.my_position[2] < 0) myself.my_position[2] += 2.0 * PI;
 
-  myself.migr[0] = myself.my_position[0]+MIGRATORY_TARGET_X;
+  // sprintf(tmp, "X:=%lf, Z=%lf, Theta=%lf\n", (double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
+  // btcomSendString(tmp);
+
+  myself.migr[0] = (myself.my_position[0]-MIGRATORY_TARGET_X);
   myself.migr[1] = 0;
+
+  sprintf(tmp, "X:=%lf\n", (double)myself.migr[0]);
+  btcomSendString(tmp);
+
+
 }
 
 /*

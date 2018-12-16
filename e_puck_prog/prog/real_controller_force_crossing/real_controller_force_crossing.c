@@ -85,6 +85,7 @@ struct robot {
   float my_position[3];        // Initial position of myself: X, Z and theta
   float my_previous_position[3];  // Initial position of myself: X, Z and theta
   float migr[2];                  // Position for the myself.migratory urge
+  int flock_ID[FLOCK_SIZE];
 } myself;
 
 uint16_t is_in_flock[FLOCK_SIZE][2];   //Store if a robot is out of range. first colomn is the time of the last message received, second 0 if out 1 if not.
@@ -248,6 +249,10 @@ void reset(void)
     myself.speed[i][1] = 0;              // Initialize speed tab Z
     is_in_flock[i][0] = 0;               // Initialze last message time to 0
     is_in_flock[i][1] = 1;               // Initialized the robot as "in flock"
+    if(i/(FLOCK_SIZE/2) ==0)
+      myself.flock_ID[i] = 0;
+    else
+      myself.flock_ID[i] = 1;
   }
 
   for(i=0;i<3;i++){
@@ -255,7 +260,7 @@ void reset(void)
     myself.my_previous_position[i] = 0;
   }
 
-  if(myself.ID == 0)
+  if(myself.ID == 0 || myself.ID == 5)
     myself.get_initial_position = 0;
   else
     myself.get_initial_position = 1;
@@ -298,6 +303,7 @@ void compute_obstacle(float *value_x, float *value_z){
 
 void update_self_motion(int msl, int msr)
 {
+
   float theta = myself.my_position[2];
 
   // Compute deltas of the robot
@@ -426,7 +432,7 @@ void reynolds_rules() {
 
   /* Compute averages over the whole flock */
   for (i = 0; i < FLOCK_SIZE; i++) {
-    if (i != myself.ID) {
+    if (i != myself.ID && myself.flock_ID[i] == myself.flock_ID[myself.ID]) {
       dist = sqrtf(myself.distances[i][0] * myself.distances[i][0] +
                    myself.distances[i][1] * myself.distances[i][1]);
 
@@ -459,7 +465,7 @@ void reynolds_rules() {
 
   /* Rule 2 - Dispersion/Separation: keep far enough from flockmates */
   for (i = 0; i < FLOCK_SIZE; i++) {
-    if (i != myself.ID) {
+    if (i != myself.ID && myself.flock_ID[i] == myself.flock_ID[myself.ID]) {
       if (sqrtf(myself.distances[i][0] * myself.distances[i][0] +
                 myself.distances[i][1] * myself.distances[i][1]) <
           RULE2_THRESHOLD) {
@@ -516,7 +522,7 @@ void process_received_ping_messages(void)
     distance = (double)imsg.distance/100.0;
     emitter_id = (int)imsg.value;
 
-    if(emitter_id == myself.ID || emitter_id >= FLOCK_SIZE){
+    if(emitter_id == myself.ID || emitter_id >= FLOCK_SIZE || myself.flock_ID[myself.ID] != myself.flock_ID[emiter_id]){
       ircomPopMessage(&imsg);
       continue;
     }
