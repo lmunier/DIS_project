@@ -31,7 +31,7 @@ typedef char int8_t;            //127
 
 #define ABS(x) ((x >= 0) ? (x) : -(x))
 
-#define FLOCK_SIZE 3    // Size of flock
+#define FLOCK_SIZE 6    // Size of flock
 #define TIME_STEP 64    // [ms] Length of time step
 #define DELTA_T 0.064   // Timestep (seconds)
 
@@ -48,15 +48,15 @@ typedef char int8_t;            //127
 
 #define TRUE 1      // true value
 
-#define RULE1_THRESHOLD  0.08           // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT (5 / 10)         // Weight of aggregation rule. default 0.6/10
-#define RULE2_THRESHOLD  (0.5 / 10)            // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.3 / 10)         // Weight of dispersion rule. default 0.02/10
-#define RULE3_WEIGHT (0.01 / 10)        // Weight of consistency rule. default 1.0/10
+#define RULE1_THRESHOLD  0.05           // Threshold to activate aggregation rule. default 0.20
+#define RULE1_WEIGHT (9 / 10)         // Weight of aggregation rule. default 0.6/10
+#define RULE2_THRESHOLD  (0.1 / 10)            // Threshold to activate dispersion rule. default 0.15
+#define RULE2_WEIGHT (0.15 / 10)         // Weight of dispersion rule. default 0.02/10
+#define RULE3_WEIGHT (0.03 / 10)        // Weight of consistency rule. default 1.0/10
 #define MARGINAL_THRESHOLD 40
 #define MIGRATION_WEIGHT (0.03 / 10)    // Wheight of attraction towards the common goal. default 0.01/10
 #define MIGRATORY_URGE 1                // Tells the robots if they should just go forward or move towards a specific myself.migratory direction
-#define MIGRATORY_TARGET_X 15
+#define MIGRATORY_TARGET_X -0.5
 
 #define TIMEOUT 50    // Limit time to consider a robot in the flock in 100ms
 #define NB_TASK 2
@@ -122,10 +122,11 @@ int main()
   float force_x = 0.0, force_z = 0.0;
   int msl, msr;  // Wheel speeds
   int nb = 1; // Variable to not saturate the communication canal
-  uint16_t t-old;
+  uint16_t t_old;
+
   reset();
 
-  wait(TIME_STEP);
+  wait(2000);
 
   ircomStart();
   ircomEnableContinuousListening();
@@ -133,9 +134,7 @@ int main()
 
   myTime.timer_reset = 0;
   while(myTime.timer_reset == 0);
-  t_old = timer_count_100ms
-  // e_set_speed_left(500);
-  // e_set_speed_right(500);
+  t_old = myTime.timer_count_100ms;
 
   while(TRUE)
   {
@@ -155,8 +154,9 @@ int main()
     process_received_ping_messages();
     check_if_out_of_range(); // Check if there is robots out of range regarding the timeout
 
-    myself.speed[myself.ID][0] = (1 / (timer_count_100ms-t_old)) * (myself.my_position[0] - myself.my_previous_position[0]);
-    myself.speed[myself.ID][1] = (1 / (timer_count_100ms-t_old)) * (myself.my_position[1] - myself.my_previous_position[1]);
+    myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);
+    myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);
+    t_old = myTime.timer_count_100ms;
 
     // Reynold's rules with all previous info (updates the speed[][] table)
     reynolds_rules();
@@ -170,8 +170,8 @@ int main()
     limit(&msl, MAX_SPEED);
     limit(&msr, MAX_SPEED);
 
-    e_set_speed_left(0);
-    e_set_speed_right(0);
+    e_set_speed_left(msl);
+    e_set_speed_right(msr);
 
     nb++;
     wait(TIME_STEP);
@@ -235,8 +235,8 @@ void reset(void)
   int i;
   myself.ID = getselector();
 
-  // sprintf(tmp, "reset_myself.ID=%d \n", myself.ID);
-  // btcomSendString(tmp);
+  sprintf(tmp, "%d\n",myself.ID);
+  btcomSendString(tmp);
 
   for(i=0; i<FLOCK_SIZE; i++)
   {
@@ -249,18 +249,28 @@ void reset(void)
     myself.speed[i][1] = 0;              // Initialize speed tab Z
     is_in_flock[i][0] = 0;               // Initialze last message time to 0
     is_in_flock[i][1] = 1;               // Initialized the robot as "in flock"
-    if(i/(FLOCK_SIZE/2) ==0)
-      myself.flock_ID[i] = 0;
-    else
-      myself.flock_ID[i] = 1;
+    switch(i){
+      case 0:
+      case 1:
+      case 2: myself.flock_ID[i]=0; break;
+      case 3:
+      case 4:
+      case 5: myself.flock_ID[i]=1; break;
+    }
   }
 
-  for(i=0;i<3;i++){
+  for(i=0;i<2;i++){
     myself.my_position[i] = 0;
     myself.my_previous_position[i] = 0;
   }
 
-  if(myself.ID == 0 || myself.ID == 5)
+  myself.my_position[2] = PI/2;
+  myself.my_previous_position[2] = PI/2;
+
+  myself.migr[0] = MIGRATORY_TARGET_X;//30;//(myself.my_position[0]-MIGRATORY_TARGET_X);
+  myself.migr[1] = 0;//15;//(myself.my_position[1]-MIGRATORY_TARGET_Z);//0;
+
+  if(myself.ID == 0)
     myself.get_initial_position = 0;
   else
     myself.get_initial_position = 1;
@@ -303,30 +313,69 @@ void compute_obstacle(float *value_x, float *value_z){
 
 void update_self_motion(int msl, int msr)
 {
+  float dist_left, dist_right;
+  float dx, dz, dtheta;
+  float R;
+  float convert_steps_to_meter;
+  dist_left = e_get_steps_left()*2.0*PI*WHEEL_RADIUS/1000.0;
+  e_set_steps_left(0);
+  dist_right = e_get_steps_right()*2.0*PI*WHEEL_RADIUS/1000.0;
+  e_set_steps_right(0);
 
-  float theta = myself.my_position[2];
+  // convert_steps_to_meter = (nb_step_left-nb_step_right)*2*PI*WHEEL_RADIUS/1000.0;
+  // dtheta = convert_steps_to_meter/AXE_LENGTH;
 
-  // Compute deltas of the robot
-  float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
-  float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
-  float du = (dr + dl) / 2.0;
-  float dtheta = (dr - dl) / (AXE_LENGTH);
+  dtheta = (dist_left-dist_right)/AXE_LENGTH;
+  if(dtheta != 0){
+    R = (dist_left+dist_right)/(2.0*dtheta);
+    dx = R*sin(dtheta);//R*(1-cos(dtheta));
+    dz = R*(1-cos(dtheta));//R*sin(dtheta);
+  }else{
+    dx = 0;
+    dz = dist_left;
+  }
 
-  // Compute deltas in the environment
-  float dx = -du * sinf(theta);
-  float dz = -du * cosf(theta);
+  myself.my_previous_position[0] = myself.my_position[0];
+  myself.my_previous_position[1] = myself.my_position[1];
+  myself.my_previous_position[2] = myself.my_position[2];
+  myself.my_position[0] += dx;
+  myself.my_position[1] += dz;
+  myself.my_position[2] -= dtheta;
 
-  // Update position
-  myself.my_position[0] += K_X  * dx;
-  myself.my_position[1] += K_Y  * dz;
-  myself.my_position[2] += K_TH * dtheta;
+  // sprintf(tmp, "X:=%lf, Z=%lf, Theta=%lf\n", (double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
+  // btcomSendString(tmp);
+
+  // float theta = myself.my_position[2];
+  //
+  // // Compute deltas of the robot
+  // float dr = (float)msr * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
+  // float dl = (float)msl * SPEED_UNIT_RADS * WHEEL_RADIUS * DELTA_T;
+  // float du = (dr + dl) / 2.0;
+  // float dtheta = (dr - dl) / (AXE_LENGTH);
+  //
+  // // Compute deltas in the environment
+  // float dx = -du * sinf(theta);
+  // float dz = -du * cosf(theta);
+  //
+  // // Update position
+  // myself.my_position[0] += K_X  * dx;
+  // myself.my_position[1] += K_Y  * dz;
+  // myself.my_position[2] += K_TH * dtheta;
 
   // Keep orientation within 0, 2pi
-  if (myself.my_position[2] > 2 * PI) myself.my_position[2] -= 2.0 * PI;
-  if (myself.my_position[2] < 0) myself.my_position[2] += 2.0 * PI;
+  if (myself.my_position[2] > PI) myself.my_position[2] -= 2.0 * PI;
+  if (myself.my_position[2] < -PI) myself.my_position[2] += 2.0 * PI;
 
-  myself.migr[0] = myself.my_position[0]+MIGRATORY_TARGET_X;
-  myself.migr[1] = 0;
+  // sprintf(tmp, "X:=%lf, Z=%lf, Theta=%lf\n", (double)myself.my_position[0],(double)myself.my_position[1],(double)myself.my_position[2]);
+  // btcomSendString(tmp);
+
+  myself.migr[0] = MIGRATORY_TARGET_X;//30;
+  myself.migr[1] = 0;//15;//(myself.my_position[1]-MIGRATORY_TARGET_Z);//0;
+
+  // sprintf(tmp, "X:=%lf\n", (double)myself.migr[0]);
+  // btcomSendString(tmp);
+
+
 }
 
 /*
@@ -487,7 +536,7 @@ void reynolds_rules() {
     myself.speed[myself.ID][j] = cohesion[j] * RULE1_WEIGHT;
     myself.speed[myself.ID][j] += dispersion[j] * RULE2_WEIGHT;
     myself.speed[myself.ID][j] += consistency[j] * RULE3_WEIGHT;
-    myself.speed[myself.ID][j] += (myself.migr[j] - myself.my_position[j]) * MIGRATION_WEIGHT;
+    myself.speed[myself.ID][j] += myself.migr[j] * MIGRATION_WEIGHT;//- myself.my_position[j]) * MIGRATION_WEIGHT;
   }
   myself.speed[myself.ID][1] *= -1;  // z axis of webots is inverted
 }
@@ -516,52 +565,41 @@ void process_received_ping_messages(void)
   {
     message_direction = (double)imsg.direction;
 
-    sprintf(tmp, "Angle%lf\n", (double)message_direction);
-    btcomSendString(tmp);
-
-    if(message_direction > PI)
-      message_direction = message_direction-2*PI;
+    if(message_direction > PI/2)
+      message_direction = (message_direction + PI/2.0) - 2.0*PI;
+    else
+      message_direction = PI/2 + message_direction;
 
     distance = (double)imsg.distance/100.0;
     emitter_id = (int)imsg.value;
 
-    if(emitter_id == myself.ID || emitter_id >= FLOCK_SIZE || myself.flock_ID[myself.ID] != myself.flock_ID[emiter_id]){
+    if(emitter_id == myself.ID || emitter_id >= FLOCK_SIZE || myself.flock_ID[emitter_id] == myself.flock_ID[myself.ID]){
       ircomPopMessage(&imsg);
       continue;
     }
-
-    // sprintf(tmp, "Emitter id=%d, Distance=%lf, Direction=%lf\n", emitter_id,distance,message_direction);
-    // btcomSendString(tmp);
-
-    // sprintf(tmp, "Queue=%d\n", emitter_id,distance,message_direction);
-    // btcomSendString(tmp);
 
     deltaT = (myTime.timer_count_100ms-is_in_flock[emitter_id][0])/10.0;
     is_in_flock[emitter_id][0] = myTime.timer_count_100ms;
 
     myself.distances[emitter_id][2] = message_direction;
-    //myself.distances[emitter_id][2] += myself.my_position[2];  // find the relative theta;
+    myself.distances[emitter_id][2] += myself.my_position[2];  // find the relative theta;
 
     if(myself.get_initial_position == 1) {
-      myself.my_position[0] = -1.0 * distance*sin(myself.distances[emitter_id][2]);
-      myself.my_position[1] = distance*cos(myself.distances[emitter_id][2]);
+      myself.my_position[0] = 1.0 * distance*cos(myself.distances[emitter_id][2]);
+      myself.my_position[1] = -1.0 * distance*sin(myself.distances[emitter_id][2]);
       myself.my_previous_position[0] = myself.my_position[0];   // relative x pos
       myself.my_previous_position[1] = myself.my_position[1];   // relative y pos
       myself.my_previous_position[2] = myself.my_position[2];
       myself.get_initial_position = 0;
-      // sprintf(tmp, "Emitter id=%d, Distance X=%lf, Distance Y=%lf, Angle=%lf\n", emitter_id,(double)myself.my_position[0],(double)myself.my_position[1]);
-      // btcomSendString(tmp);
     } else {
       myself.previousDistances[emitter_id][0] = myself.distances[emitter_id][0];
       myself.previousDistances[emitter_id][1] = myself.distances[emitter_id][1];
       myself.previousDistances[emitter_id][2] = myself.distances[emitter_id][2];
-      myself.distances[emitter_id][0] = -1.0 * distance*sin(myself.distances[emitter_id][2]);  // relative x pos
-      myself.distances[emitter_id][1] = distance*cos(myself.distances[emitter_id][2]);   // relative y pos
+      myself.distances[emitter_id][0] = 1.0 * distance*cos(myself.distances[emitter_id][2]);  // relative x pos
+      myself.distances[emitter_id][1] = -1.0 * distance*sin(myself.distances[emitter_id][2]);   // relative y pos
       myself.speed[emitter_id][0] = 1.0*(1/deltaT)*(myself.distances[emitter_id][0]-myself.previousDistances[emitter_id][0]);
       myself.speed[emitter_id][1] = 1.0*(1/deltaT)*(myself.distances[emitter_id][1]-myself.previousDistances[emitter_id][1]);
     }
-    // sprintf(tmp, "Emitter id=%d, Distance X=%lf, Distance Z=%lf, Angle=%lf\n", emitter_id,(double)myself.distances[emitter_id][0],(double)myself.distances[emitter_id][1],(double)message_direction);
-    // btcomSendString(tmp);
     ircomPopMessage(&imsg);
   }
 }
