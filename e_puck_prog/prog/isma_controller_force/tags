@@ -1,0 +1,75 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+ABS	real_controller_force.c	32;"	d	file:
+AXE_LENGTH	real_controller_force.c	38;"	d	file:
+DELTA_T	real_controller_force.c	36;"	d	file:
+FLOCK_SIZE	real_controller_force.c	34;"	d	file:
+ID	real_controller_force.c	/^  int ID;    \/\/ ID of myself$/;"	m	struct:robot	file:
+K_OLD	real_controller_force.c	70;"	d	file:
+K_TH	real_controller_force.c	67;"	d	file:
+K_U	real_controller_force.c	68;"	d	file:
+K_W	real_controller_force.c	69;"	d	file:
+K_X	real_controller_force.c	65;"	d	file:
+K_Y	real_controller_force.c	66;"	d	file:
+MARGINAL_THRESHOLD	real_controller_force.c	56;"	d	file:
+MAX_SENS	real_controller_force.c	46;"	d	file:
+MAX_SPEED	real_controller_force.c	47;"	d	file:
+MIGRATION_WEIGHT	real_controller_force.c	57;"	d	file:
+MIGRATORY_TARGET_Z	real_controller_force.c	59;"	d	file:
+MIGRATORY_URGE	real_controller_force.c	58;"	d	file:
+MIN_SENS	real_controller_force.c	45;"	d	file:
+NB_SENSORS	real_controller_force.c	43;"	d	file:
+NB_TASK	real_controller_force.c	62;"	d	file:
+OBSTACLE_THRESHOLD	real_controller_force.c	44;"	d	file:
+PI	real_controller_force.c	41;"	d	file:
+RULE1_THRESHOLD	real_controller_force.c	51;"	d	file:
+RULE1_WEIGHT	real_controller_force.c	52;"	d	file:
+RULE2_THRESHOLD	real_controller_force.c	53;"	d	file:
+RULE2_WEIGHT	real_controller_force.c	54;"	d	file:
+RULE3_WEIGHT	real_controller_force.c	55;"	d	file:
+SPEED_UNIT_RADS	real_controller_force.c	39;"	d	file:
+TIMEOUT	real_controller_force.c	61;"	d	file:
+TIME_STEP	real_controller_force.c	35;"	d	file:
+TRUE	real_controller_force.c	49;"	d	file:
+WHEEL_RADIUS	real_controller_force.c	40;"	d	file:
+box_muller	real_controller_force.c	/^float box_muller(float m, float s)	\/* normal random variate generator *\/$/;"	f
+check_if_out_of_range	real_controller_force.c	/^void check_if_out_of_range(){$/;"	f
+compute_obstacle	real_controller_force.c	/^void compute_obstacle(float *value_x, float *value_z){$/;"	f
+compute_wheel_speeds	real_controller_force.c	/^void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {$/;"	f
+distances	real_controller_force.c	/^  float distances[FLOCK_SIZE][2];  \/\/ Store the distances between myself and other robots$/;"	m	struct:robot	file:
+e_puck_matrix	real_controller_force.c	/^int e_puck_matrix[16] = {$/;"	v
+get_initial_position	real_controller_force.c	/^  int get_initial_position;  \/\/ Control if initialized, 0=not, 1=yes$/;"	m	struct:robot	file:
+getselector	real_controller_force.c	/^int getselector()$/;"	f
+int16_t	real_controller_force.c	/^typedef int int16_t;            \/\/32768$/;"	t	file:
+int8_t	real_controller_force.c	/^typedef char int8_t;            \/\/127$/;"	t	file:
+is_in_flock	real_controller_force.c	/^uint16_t is_in_flock[FLOCK_SIZE][2];   \/\/Store if a robot is out of range. first colomn is the time of the last message received, second 0 if out 1 if not.$/;"	v
+limit	real_controller_force.c	/^void limit(int *number, int limit)$/;"	f
+main	real_controller_force.c	/^int main()$/;"	f
+migr	real_controller_force.c	/^  float migr[2];                  \/\/ Position for the myself.migratory urge$/;"	m	struct:robot	file:
+myTime	real_controller_force.c	/^}myTime;$/;"	v	typeref:struct:time
+my_position	real_controller_force.c	/^  float my_position[3];        \/\/ Initial position of myself: X, Z and theta$/;"	m	struct:robot	file:
+my_previous_position	real_controller_force.c	/^  float my_previous_position[3];  \/\/ Initial position of myself: X, Z and theta$/;"	m	struct:robot	file:
+myself	real_controller_force.c	/^} myself;$/;"	v	typeref:struct:robot
+previousDistances	real_controller_force.c	/^  float previousDistances[FLOCK_SIZE][2];  \/\/ Store the previous distances$/;"	m	struct:robot	file:
+process_received_ping_messages	real_controller_force.c	/^void process_received_ping_messages(void)$/;"	f
+relAngle	real_controller_force.c	/^  float relAngle[FLOCK_SIZE];  \/\/ Store the relative angle of the other robots$/;"	m	struct:robot	file:
+reset	real_controller_force.c	/^void reset(void)$/;"	f
+reynolds_rules	real_controller_force.c	/^void reynolds_rules() {$/;"	f
+robot	real_controller_force.c	/^struct robot {$/;"	s	file:
+send_ping	real_controller_force.c	/^void send_ping(void)$/;"	f
+speed	real_controller_force.c	/^  float speed[FLOCK_SIZE][2];  \/\/ Store the relative speed of the other robots$/;"	m	struct:robot	file:
+time	real_controller_force.c	/^struct time{$/;"	s	file:
+timer	real_controller_force.c	/^void timer(void)$/;"	f
+timer_count_100ms	real_controller_force.c	/^  uint16_t timer_count_100ms;   \/\/ Time in 100ms$/;"	m	struct:time	file:
+timer_done	real_controller_force.c	/^  int8_t   timer_done[NB_TASK];$/;"	m	struct:time	file:
+timer_reset	real_controller_force.c	/^  int8_t   timer_reset;$/;"	m	struct:time	file:
+tmp	real_controller_force.c	/^char tmp[128];$/;"	v
+uint16_t	real_controller_force.c	/^typedef unsigned int uint16_t;  \/\/ 65300$/;"	t	file:
+uint8_t	real_controller_force.c	/^typedef unsigned char uint8_t;  \/\/255$/;"	t	file:
+update_self_motion	real_controller_force.c	/^void update_self_motion(int msl, int msr)$/;"	f
+wait	real_controller_force.c	/^void wait(uint16_t ms)$/;"	f
+wait_task	real_controller_force.c	/^void wait_task(void)$/;"	f
