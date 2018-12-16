@@ -35,6 +35,7 @@ float position[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
 float loc[FLOCK_SIZE][3] = {0};		// Location of everybody in the flock
 float relative_loc[FLOCK_SIZE][3] = {0};          // Relative location of everybody in the flock
 
+float fit_c = 0.0, fit_o = 0.0, fit_s = 0.0;
 int offset;			// Offset of robots number
 float migr[2] = {0, -5};	           // Migration vector
 float orient_migr; 			// Migration orientation
@@ -111,8 +112,11 @@ void compute_positions(void) {
 void compute_fitness(float *p_t, float *p_mean, int offset, float *old_mean_x, float *old_mean_z) {
     float mean_x = 0.0, mean_z = 0.0;
     float dist = 0.0, max_a = 0.0;
-    float fit_c = 0.0, fit_o = 0.0, fit_s = 0.0;
     float im_o = 0.0, re_o = 0.0;
+
+    fit_c = 0.0;
+    fit_o = 0.0;
+    fit_s = 0.0;
     
     // Compute center of mass of the flock (mean of position x and z)
     for(int i=0; i<FLOCK_SIZE/NB_GROUPS; i++){
@@ -138,15 +142,17 @@ void compute_fitness(float *p_t, float *p_mean, int offset, float *old_mean_x, f
     // Distance between robots    
     fit_c = 1/((dist/(FLOCK_SIZE/NB_GROUPS)) + 1);
     
-    // Velocity of the team towards the goal direction
-    max_a = 1000.0*((mean_x - *old_mean_x)*migr[1] - (mean_z - *old_mean_z)*migr[0]);
-    max_a /= sqrtf(migr[0]*migr[0] + migr[1]*migr[1])*MAX_SPEED*TIME_STEP;
-    
-    if(offset == 0)
-      fit_s = (max_a < 0) ? 0 : max_a;
-    else
-      fit_s = (-max_a < 0) ? 0 : -max_a;
-    
+    if(t > 0){
+        // Velocity of the team towards the goal direction
+        max_a = 1000.0*((mean_x - *old_mean_x)*migr[1] - (mean_z - *old_mean_z)*migr[0]);
+        max_a /= sqrtf(migr[0]*migr[0] + migr[1]*migr[1])*MAX_SPEED*TIME_STEP;
+        
+        if(offset == 0)
+        fit_s = (max_a < 0) ? 0 : max_a;
+        else
+        fit_s = (-max_a < 0) ? 0 : -max_a;
+    }
+
     #ifdef VERBOSE_METRICS
       if(offset == 0)
         printf("BAD_BOYS: fit_o = %f fit_c = %f fit_s = %f\n", fit_o, fit_c, fit_s);
@@ -163,6 +169,28 @@ void compute_fitness(float *p_t, float *p_mean, int offset, float *old_mean_x, f
 }
 
 /*
+ * Function to write metrics in file
+ */
+void write_file(char *name, int time, float cohesion, float orientation,
+                float velocity, float p_time, float p_mean, bool init_column) {
+  char filename[70];
+  FILE *fp;
+
+  sprintf(filename, "../../../../results/crossing_simulation/%s.csv", name);
+
+  if ((fp = fopen(filename, "a")) == NULL) {
+    printf("Cannot open file.\n");
+    exit(1);
+  }
+
+  if (!init_column)
+    fprintf(fp, "time,cohesion,orientation,velocity,p_time,p_mean\n");
+
+  fprintf(fp, "%d,%f,%f,%f,%f,%f\n", time, cohesion, orientation, velocity, p_time,p_mean);
+  fclose(fp);
+}
+
+/*
  * Main function.
  */
 int main(int argc, char *args[]) {
@@ -171,6 +199,7 @@ int main(int argc, char *args[]) {
     static float p_t_badboys = 0.0, p_mean_badboys = 0.0;
     static float old_mean_x_goodboys = 0.0, old_mean_z_goodboys = 0.0;
     static float old_mean_x_badboys = 0.0, old_mean_z_badboys = 0.0;
+    bool init_write = false;
     
     reset();
     		
@@ -180,13 +209,18 @@ int main(int argc, char *args[]) {
         
         // Compute and normalize fitness values
         compute_fitness(&p_t_badboys, &p_mean_badboys, BAD_BOYS, &old_mean_x_badboys, &old_mean_z_badboys);
-        
+        write_file("badboys", t, fit_c, fit_o, fit_s, p_t_badboys, p_mean_badboys, init_write);
+
         #ifdef VERBOSE_METRICS
             printf("BAD_BOYS: p_t = %f \t p_mean = %f\n\n", p_t_badboys, p_mean_badboys);
         #endif
         
         compute_fitness(&p_t_goodboys, &p_mean_goodboys, GOOD_BOYS, &old_mean_x_goodboys, &old_mean_z_goodboys);
-        
+        write_file("goodboys", t, fit_c, fit_o, fit_s, p_t_goodboys, p_mean_goodboys, init_write);
+
+        if(!init_write)
+            init_write = true;
+
         #ifdef VERBOSE_METRICS
             printf("GOOD_BOYS: p_t = %f \t p_mean = %f\n\n", p_t_goodboys, p_mean_goodboys);
         #endif
