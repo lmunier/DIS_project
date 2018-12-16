@@ -43,12 +43,12 @@
 #define MAX_SPEED_WEB 6.28      // Maximum speed webots
 /*Webots 2018b*/
 
-#define RULE1_THRESHOLD 0.08          // Threshold to activate aggregation rule. default 0.20
-#define RULE1_WEIGHT 0.5              // Weight of aggregation rule. default 0.6/10
-#define RULE2_THRESHOLD 0.05          // Threshold to activate dispersion rule. default 0.15
-#define RULE2_WEIGHT (0.03 / 10)      // Weight of dispersion rule. default 0.02/10
-#define RULE3_WEIGHT (0.01 / 10)      // Weight of consistency rule. default 1.0/10
-#define MARGINAL_THRESHOLD 40         // Distance to take an e-puck into a group
+#define RULE1_THRESHOLD 0.05          // Threshold to activate aggregation rule. default 0.20
+#define RULE1_WEIGHT 0.9              // Weight of aggregation rule. default 0.6/10
+#define RULE2_THRESHOLD 0.01          // Threshold to activate dispersion rule. default 0.15
+#define RULE2_WEIGHT (0.15 / 10)      // Weight of dispersion rule. default 0.02/10
+#define RULE3_WEIGHT (0.03 / 10)      // Weight of consistency rule. default 1.0/10
+#define MARGINAL_THRESHOLD 0.22       // Distance to take an e-puck into a group
 #define MIGRATION_WEIGHT (0.03 / 10)  // Wheight of attraction towards the common goal. default 0.01/10
 
 // Odometry correction
@@ -60,8 +60,8 @@
 #define K_W 2       // Rotational control coefficient
 #define K_OLD 0.2   // Influence of previous motor command
 #define REYNOLDS_WEIGHT 80
-#define OBSTACLE_WEIGHT 30
-#define REYNOLDS_WHEIGHT_NO_OBSTACLE 110
+#define OBSTACLE_WEIGHT 40
+#define REYNOLDS_WEIGHT_NO_OBSTACLE 110
 
 int t;  // Time
 
@@ -245,8 +245,8 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
     x =REYNOLDS_WEIGHT*x - OBSTACLE_WEIGHT*force_x;
     z =REYNOLDS_WEIGHT*z - OBSTACLE_WEIGHT*force_z;
   } else {
-    x = REYNOLDS_WHEIGHT_NO_OBSTACLE*x;
-    z = REYNOLDS_WHEIGHT_NO_OBSTACLE*z;
+    x = REYNOLDS_WEIGHT_NO_OBSTACLE*x;
+    z = REYNOLDS_WEIGHT_NO_OBSTACLE*z;
   }
 
   // Print only if define
@@ -467,8 +467,8 @@ int main() {
   // Forever
   while (true) {
     /* Send and get information */
-    if(myself.ID == 1)
-      send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
+
+    send_ping();  // sending a ping to other robot, so they can measure their distance to this robot
 
     // Compute self position
     myself.my_previous_position[0] = myself.my_position[0];
@@ -476,8 +476,7 @@ int main() {
     myself.my_previous_position[2] = myself.my_position[2];
 
     update_self_motion(msl, msr);
-    if(myself.ID == 0)
-      process_received_ping_messages();
+    process_received_ping_messages();
 
     myself.speed[myself.ID][0] = (1 / DELTA_T) * (myself.my_position[0] - myself.my_previous_position[0]);
     myself.speed[myself.ID][1] = (1 / DELTA_T) * (myself.my_position[1] - myself.my_previous_position[1]);
@@ -501,7 +500,6 @@ int main() {
 
     wb_motor_set_velocity(left_motor, msl_w);
     wb_motor_set_velocity(right_motor, msr_w);
-    // wb_differential_wheels_set_speed(msl,msr);
     /*Webots 2018b*/
 
     // Continue one step
