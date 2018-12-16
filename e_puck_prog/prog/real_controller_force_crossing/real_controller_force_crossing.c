@@ -1,5 +1,5 @@
 /*****************************************************************************/
-/* File:         real_controller_force.c                                               */
+/* File:         real_controller_force_crossing.c                                               */
 /* Version:      1.1                                                         */
 /* Date:         12.dec.2018                                                   */
 /* Description:  Reynolds flocking with relative positions	           */
@@ -68,6 +68,11 @@ typedef char int8_t;            //127
 #define K_U 	0.2   // Forward control coefficient
 #define K_W 	1  	  // Rotational control coefficient
 #define K_OLD 0.2
+
+// Factor to tune the obstacle avoidance compared to the Reynolds rules
+#define OBSTACLE_WEIGHT 20.0
+#define REYNOLDS_WEIGHT 80.0
+#define REYNOLDS_WEIGHT_NO_OBSTACLE 70
 
 struct robot {
   int ID;                                   // ID of myself
@@ -391,18 +396,16 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
   // Speed Z in robot coordinates from global coordinates
   float z = -myself.speed[myself.ID][0] * sinf(myself.my_position[2]) + myself.speed[myself.ID][1] * cosf(myself.my_position[2]);
 
-  float K = 80;
-  float K_F = 20;
   float val_x = 0;
   float val_z = 0;
 
   // Adapt forces
   if(force_x != 0 || force_z != 0 ){
-    val_x = K*x - K_F*force_x;
-    val_z = K*z - K_F*force_z;
+    val_x = REYNOLDS_WEIGHT*x - OBSTACLE_WEIGHT*force_x;
+    val_z = REYNOLDS_WEIGHT*z - OBSTACLE_WEIGHT*force_z;
   } else {
-   val_x = 70*x;
-   val_z = 70*z;
+   val_x = REYNOLDS_WEIGHT_NO_OBSTACLE*x;
+   val_z = REYNOLDS_WEIGHT_NO_OBSTACLE*z;
   }
 
   x = val_x;
