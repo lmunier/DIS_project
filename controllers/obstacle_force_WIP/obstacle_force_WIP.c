@@ -242,6 +242,9 @@ void compute_wheel_speeds(int *msl, int *msr, float force_x, float force_z) {
   float K_F = 50;
   float val_x = 0;
   float val_z = 0;
+  
+  x = 0.0;
+  z = 0.0;
 
   if(force_x != 0 || force_z != 0 ){
     val_x = K*x - K_F*force_x;
@@ -542,8 +545,8 @@ int main() {
     //msl_w = (float)msl * MAX_SPEED_WEB / 1000;
     //msr_w = (float)msr * MAX_SPEED_WEB / 1000;
 
-    wb_motor_set_velocity(left_motor, 0);
-    wb_motor_set_velocity(right_motor, 0);
+    wb_motor_set_velocity(left_motor, msl_w);
+    wb_motor_set_velocity(right_motor, msr_w);
     // wb_differential_wheels_set_speed(msl,msr);
     /*Webots 2018b*/
 
