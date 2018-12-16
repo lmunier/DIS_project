@@ -10,7 +10,7 @@
 #include <webots/supervisor.h>
 
 #define METRICS
-#define FLOCK_SIZE	10		// Number of robots in flock
+#define FLOCK_SIZE	5		// Number of robots in flock
 #define TIME_STEP	64		// [ms] Length of time step
 #define fit_cluster_ref 0.03
 #define fit_orient_ref 1.0
