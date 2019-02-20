@@ -8,8 +8,8 @@ WorldInfo {
   basicTimeStep 16
 }
 Viewpoint {
-  orientation -0.4384332280126161 -0.7536298151249998 -0.48971257522050243 2.009548731827043
-  position -3.215845079939643 1.0976025348812384 -0.1322306555076273
+  orientation -0.5753499756699592 -0.5960383124086778 -0.5600988623784133 2.091127913058973
+  position -2.6522747541720486 1.3480186437298862 -0.011216713064612732
 }
 PointLight {
   intensity 0.5
@@ -175,31 +175,6 @@ DEF rock Solid {
   }
 }
 DEF rock Solid {
-  translation -1.38774 0 -1.06532
-  rotation 0 -1 0 2.05704
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.05 0.2 0.05
-      }
-    }
-  ]
-  name "rock solid 2"
-  boundingObject DEF U_END_BOX Box {
-    size 0.05 0.2 0.05
-  }
-}
-DEF rock Solid {
   translation 1.25364 0 0.47529
   rotation 0 -1 0 2.05704
   children [
@@ -220,81 +195,6 @@ DEF rock Solid {
     }
   ]
   name "rock solid 3"
-  boundingObject DEF U_END_BOX Box {
-    size 0.05 0.2 0.05
-  }
-}
-DEF rock Solid {
-  translation -1.53541 0 0.16115
-  rotation 0 -1 0 2.05704
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.05 0.2 0.05
-      }
-    }
-  ]
-  name "rock solid 4"
-  boundingObject DEF U_END_BOX Box {
-    size 0.05 0.2 0.05
-  }
-}
-DEF rock Solid {
-  translation -1.34035 0 0.776227
-  rotation 0 -1 0 2.05704
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.05 0.2 0.05
-      }
-    }
-  ]
-  name "rock solid 5"
-  boundingObject DEF U_END_BOX Box {
-    size 0.05 0.2 0.05
-  }
-}
-DEF rock Solid {
-  translation -2.34293 0 -0.0741107
-  rotation 0 -1 0 2.05704
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.05 0.2 0.05
-      }
-    }
-  ]
-  name "rock solid 6"
   boundingObject DEF U_END_BOX Box {
     size 0.05 0.2 0.05
   }
@@ -446,31 +346,7 @@ DEF rock Solid {
   }
 }
 DEF rock Solid {
-  translation -1.05597 -1.77636e-15 1.72366
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.15 0.2 0.15
-      }
-    }
-  ]
-  name "rock solid 13"
-  boundingObject DEF U_END_BOX Box {
-    size 0.15 0.2 0.15
-  }
-}
-DEF rock Solid {
-  translation -1.95487 0 -0.686015
+  translation -2.48800145571072 1.2168044349891716e-13 -0.00020592289382759255
   children [
     Shape {
       appearance Appearance {
@@ -491,31 +367,6 @@ DEF rock Solid {
   name "rock solid 14"
   boundingObject DEF U_END_BOX Box {
     size 0.15 0.2 0.37
-  }
-}
-DEF rock Solid {
-  translation -2.696963309348502 -4.3520742565306136e-14 -0.1385535262991059
-  rotation 0 -1 0 2.05704
-  children [
-    Shape {
-      appearance Appearance {
-        material Material {
-          diffuseColor 1 1 1
-        }
-        texture ImageTexture {
-          url [
-            "textures/stone-2.png"
-          ]
-        }
-      }
-      geometry Box {
-        size 0.15 0.2 0.15
-      }
-    }
-  ]
-  name "rock solid 15"
-  boundingObject DEF U_END_BOX Box {
-    size 0.15 0.2 0.15
   }
 }
 Supervisor {
